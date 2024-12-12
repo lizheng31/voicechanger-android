@@ -35,4 +35,6 @@
 
     <color name="seed">#006C4C</color>
     <color name="error">#BA1A1A</color>
+    <color name="selected_item_color">#91D8CE</color>
+    <color name="default_item_color">#FFFFFFFF</color>
 </resources>

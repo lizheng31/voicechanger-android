@@ -47,7 +47,9 @@ public class AudioListAdapter extends RecyclerView.Adapter<AudioListAdapter.View
         holder.audioDateText.setText(item.getDate());
         
         MaterialCardView cardView = (MaterialCardView) holder.itemView;
-        cardView.setChecked(item == selectedItem);
+        cardView.setCardBackgroundColor(item == selectedItem ? 
+            cardView.getContext().getColor(R.color.selected_item_color) : 
+            cardView.getContext().getColor(R.color.default_item_color));
         
         holder.itemView.setOnClickListener(v -> {
             if (selectedItem != item) {
