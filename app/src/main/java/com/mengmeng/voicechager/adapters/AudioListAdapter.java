@@ -4,7 +4,10 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
+import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.card.MaterialCardView;
 import com.mengmeng.voicechager.R;
 import com.mengmeng.voicechager.models.AudioItem;
 import java.util.ArrayList;
@@ -13,10 +16,12 @@ import java.util.List;
 public class AudioListAdapter extends RecyclerView.Adapter<AudioListAdapter.ViewHolder> {
     private List<AudioItem> audioItems = new ArrayList<>();
     private OnItemClickListener listener;
+    private AudioItem selectedItem;
 
     public interface OnItemClickListener {
-        void onPlayClick(AudioItem item);
+        void onPlayClick(AudioItem item, MaterialButton playButton);
         void onDeleteClick(AudioItem item);
+        void onItemSelected(AudioItem item);
     }
 
     public void setOnItemClickListener(OnItemClickListener listener) {
@@ -36,9 +41,39 @@ public class AudioListAdapter extends RecyclerView.Adapter<AudioListAdapter.View
     }
 
     @Override
-    public void onBindViewHolder(ViewHolder holder, int position) {
+    public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         AudioItem item = audioItems.get(position);
-        holder.bind(item);
+        holder.audioNameText.setText(item.getName());
+        holder.audioDateText.setText(item.getDate());
+        
+        MaterialCardView cardView = (MaterialCardView) holder.itemView;
+        cardView.setChecked(item == selectedItem);
+        
+        holder.itemView.setOnClickListener(v -> {
+            if (selectedItem != item) {
+                AudioItem oldSelection = selectedItem;
+                selectedItem = item;
+                if (oldSelection != null) {
+                    notifyItemChanged(audioItems.indexOf(oldSelection));
+                }
+                notifyItemChanged(position);
+                if (listener != null) {
+                    listener.onItemSelected(item);
+                }
+            }
+        });
+
+        holder.playButton.setOnClickListener(v -> {
+            if (listener != null) {
+                listener.onPlayClick(item, holder.playButton);
+            }
+        });
+
+        holder.deleteButton.setOnClickListener(v -> {
+            if (listener != null) {
+                listener.onDeleteClick(item);
+            }
+        });
     }
 
     @Override
@@ -47,34 +82,36 @@ public class AudioListAdapter extends RecyclerView.Adapter<AudioListAdapter.View
     }
 
     class ViewHolder extends RecyclerView.ViewHolder {
-        TextView nameText;
-        TextView dateText;
-        View playButton;
-        View deleteButton;
+        TextView audioNameText;
+        TextView audioDateText;
+        MaterialButton playButton;
+        MaterialButton deleteButton;
 
         ViewHolder(View itemView) {
             super(itemView);
-            nameText = itemView.findViewById(R.id.audioNameText);
-            dateText = itemView.findViewById(R.id.audioDateText);
+            audioNameText = itemView.findViewById(R.id.audioNameText);
+            audioDateText = itemView.findViewById(R.id.audioDateText);
             playButton = itemView.findViewById(R.id.playButton);
             deleteButton = itemView.findViewById(R.id.deleteButton);
         }
+    }
 
-        void bind(AudioItem item) {
-            nameText.setText(item.getName());
-            dateText.setText(item.getDate());
-            
-            playButton.setOnClickListener(v -> {
-                if (listener != null) {
-                    listener.onPlayClick(item);
-                }
-            });
+    public AudioItem getSelectedItem() {
+        return selectedItem;
+    }
 
-            deleteButton.setOnClickListener(v -> {
-                if (listener != null) {
-                    listener.onDeleteClick(item);
-                }
-            });
+    public void setSelectedItem(AudioItem item) {
+        AudioItem oldSelection = selectedItem;
+        selectedItem = item;
+        if (oldSelection != null) {
+            notifyItemChanged(audioItems.indexOf(oldSelection));
         }
+        if (item != null) {
+            notifyItemChanged(audioItems.indexOf(item));
+        }
+    }
+
+    public List<AudioItem> getAudioItems() {
+        return audioItems;
     }
 } 

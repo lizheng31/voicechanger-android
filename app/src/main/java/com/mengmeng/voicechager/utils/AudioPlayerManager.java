@@ -6,6 +6,11 @@ import java.io.IOException;
 public class AudioPlayerManager {
     private MediaPlayer mediaPlayer;
     private String currentAudioPath;
+    private boolean isPaused = false;
+
+    public String getCurrentAudioPath() {
+        return currentAudioPath;
+    }
 
     public void playAudio(String audioPath) throws IOException {
         if (mediaPlayer != null) {
@@ -17,18 +22,42 @@ public class AudioPlayerManager {
         mediaPlayer.setDataSource(audioPath);
         mediaPlayer.prepare();
         mediaPlayer.start();
+        isPaused = false;
+        
+        mediaPlayer.setOnCompletionListener(mp -> {
+            isPaused = false;
+            if (onPlaybackCompleteListener != null) {
+                onPlaybackCompleteListener.onComplete();
+            }
+        });
     }
 
     public void pauseAudio() {
         if (mediaPlayer != null && mediaPlayer.isPlaying()) {
             mediaPlayer.pause();
+            isPaused = true;
         }
     }
 
     public void resumeAudio() {
-        if (mediaPlayer != null && !mediaPlayer.isPlaying()) {
+        if (mediaPlayer != null && isPaused) {
             mediaPlayer.start();
+            isPaused = false;
         }
+    }
+
+    public boolean isPaused() {
+        return isPaused;
+    }
+
+    public interface OnPlaybackCompleteListener {
+        void onComplete();
+    }
+
+    private OnPlaybackCompleteListener onPlaybackCompleteListener;
+
+    public void setOnPlaybackCompleteListener(OnPlaybackCompleteListener listener) {
+        this.onPlaybackCompleteListener = listener;
     }
 
     public void stopAudio() {
@@ -36,6 +65,7 @@ public class AudioPlayerManager {
             mediaPlayer.stop();
             mediaPlayer.release();
             mediaPlayer = null;
+            currentAudioPath = null;
         }
     }
 

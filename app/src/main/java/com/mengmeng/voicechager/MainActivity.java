@@ -26,15 +26,12 @@ import com.mengmeng.voicechager.adapters.AudioListAdapter;
 import com.mengmeng.voicechager.models.AudioItem;
 import android.widget.Toast;
 import com.google.android.material.appbar.MaterialToolbar;
-import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton;
 
 public class MainActivity extends AppCompatActivity {
     private MaterialButton recordButton;
-    private MaterialButton playButton;
-    private MaterialButton saveButton;
+    private MaterialButton convertButton;
     private TextView recordingStatusText;
     private Chronometer recordingTimer;
-    private View previewControls;
 
     private AudioRecordService audioRecordService;
     private AudioPlayerManager audioPlayerManager;
@@ -42,6 +39,7 @@ public class MainActivity extends AppCompatActivity {
     private VoiceUploadManager voiceUploadManager;
     private RecyclerView audioListView;
     private AudioListAdapter audioListAdapter;
+    private AudioItem selectedAudioItem;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -59,15 +57,18 @@ public class MainActivity extends AppCompatActivity {
     private void initServices() {
         audioRecordService = new AudioRecordService(this);
         audioPlayerManager = new AudioPlayerManager();
+        audioPlayerManager.setOnPlaybackCompleteListener(() -> {
+            runOnUiThread(() -> {
+                convertButton.setText("变声");
+            });
+        });
     }
 
     private void initViews() {
         recordButton = findViewById(R.id.recordButton);
-        playButton = findViewById(R.id.playButton);
-        saveButton = findViewById(R.id.saveButton);
+        convertButton = findViewById(R.id.convertButton);
         recordingStatusText = findViewById(R.id.recordingStatusText);
         recordingTimer = findViewById(R.id.recordingTimer);
-        previewControls = findViewById(R.id.previewControls);
 
         MaterialToolbar topAppBar = findViewById(R.id.topAppBar);
         topAppBar.setOnMenuItemClickListener(item -> {
@@ -76,13 +77,6 @@ public class MainActivity extends AppCompatActivity {
                 return true;
             }
             return false;
-        });
-
-        ExtendedFloatingActionButton fab = findViewById(R.id.fab);
-        fab.setOnClickListener(v -> {
-            if (!isRecording) {
-                startRecording();
-            }
         });
     }
 
@@ -95,22 +89,10 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        playButton.setOnClickListener(v -> {
-            try {
-                if (!audioPlayerManager.isPlaying()) {
-                    audioPlayerManager.playAudio(audioRecordService.getCurrentFilePath());
-                    playButton.setText("暂停");
-                } else {
-                    audioPlayerManager.pauseAudio();
-                    playButton.setText("播放");
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
+        convertButton.setOnClickListener(v -> {
+            if (selectedAudioItem != null) {
+                uploadVoice(selectedAudioItem.getPath());
             }
-        });
-
-        saveButton.setOnClickListener(v -> {
-            uploadVoice();
         });
     }
 
@@ -144,7 +126,6 @@ public class MainActivity extends AppCompatActivity {
             recordingTimer.setVisibility(View.VISIBLE);
             recordingTimer.setBase(android.os.SystemClock.elapsedRealtime());
             recordingTimer.start();
-            previewControls.setVisibility(View.GONE);
         } catch (Exception e) {
             e.printStackTrace();
             Toast.makeText(this, "录音失败：" + e.getMessage(), Toast.LENGTH_SHORT).show();
@@ -158,12 +139,10 @@ public class MainActivity extends AppCompatActivity {
         recordingStatusText.setText("录音完成");
         recordingTimer.stop();
         recordingTimer.setVisibility(View.GONE);
-        previewControls.setVisibility(View.VISIBLE);
         loadAudioList();
     }
 
-    private void uploadVoice() {
-        String filePath = audioRecordService.getCurrentFilePath();
+    private void uploadVoice(String filePath) {
         if (filePath != null) {
             File audioFile = new File(filePath);
             if (!audioFile.exists()) {
@@ -210,25 +189,66 @@ public class MainActivity extends AppCompatActivity {
         
         audioListAdapter.setOnItemClickListener(new AudioListAdapter.OnItemClickListener() {
             @Override
-            public void onPlayClick(AudioItem item) {
+            public void onPlayClick(AudioItem item, MaterialButton playButton) {
                 try {
-                    audioPlayerManager.playAudio(item.getPath());
+                    if (!audioPlayerManager.isPlaying() || 
+                        !item.getPath().equals(audioPlayerManager.getCurrentAudioPath())) {
+                        if (audioPlayerManager.isPaused() && 
+                            item.getPath().equals(audioPlayerManager.getCurrentAudioPath())) {
+                            audioPlayerManager.resumeAudio();
+                            playButton.setIconResource(android.R.drawable.ic_media_pause);
+                        } else {
+                            audioPlayerManager.playAudio(item.getPath());
+                            playButton.setIconResource(android.R.drawable.ic_media_pause);
+                        }
+                    } else {
+                        audioPlayerManager.pauseAudio();
+                        playButton.setIconResource(android.R.drawable.ic_media_play);
+                    }
                 } catch (IOException e) {
                     e.printStackTrace();
+                    Toast.makeText(MainActivity.this, 
+                        "播放失败：" + e.getMessage(), 
+                        Toast.LENGTH_SHORT).show();
                 }
             }
 
             @Override
             public void onDeleteClick(AudioItem item) {
-                // TODO: 实现删除功能
                 File file = new File(item.getPath());
                 if (file.delete()) {
+                    if (selectedAudioItem != null && 
+                        selectedAudioItem.getPath().equals(item.getPath())) {
+                        selectedAudioItem = null;
+                        convertButton.setEnabled(false);
+                    }
                     loadAudioList();
                 }
+            }
+
+            @Override
+            public void onItemSelected(AudioItem item) {
+                selectedAudioItem = item;
+                convertButton.setEnabled(true);
             }
         });
 
         loadAudioList();
+
+        audioPlayerManager.setOnPlaybackCompleteListener(() -> {
+            runOnUiThread(() -> {
+                int position = audioListAdapter.getAudioItems().indexOf(selectedAudioItem);
+                if (position != -1) {
+                    RecyclerView.ViewHolder viewHolder = 
+                        audioListView.findViewHolderForAdapterPosition(position);
+                    if (viewHolder != null) {
+                        MaterialButton playButton = 
+                            viewHolder.itemView.findViewById(R.id.playButton);
+                        playButton.setIconResource(android.R.drawable.ic_media_play);
+                    }
+                }
+            });
+        });
     }
 
     private void loadAudioList() {
