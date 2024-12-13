@@ -28,6 +28,11 @@ import android.widget.Toast;
 import com.google.android.material.appbar.MaterialToolbar;
 import java.io.FileOutputStream;
 import android.util.Log;
+import android.widget.Spinner;
+import android.widget.ArrayAdapter;
+import android.widget.AdapterView;
+import com.mengmeng.voicechager.models.VoiceType;
+import android.widget.AutoCompleteTextView;
 
 public class MainActivity extends AppCompatActivity {
     private MaterialButton recordButton;
@@ -42,6 +47,8 @@ public class MainActivity extends AppCompatActivity {
     private RecyclerView audioListView;
     private AudioListAdapter audioListAdapter;
     private AudioItem selectedAudioItem;
+    private AutoCompleteTextView voiceTypeSpinner;
+    private VoiceType selectedVoiceType = VoiceType.CHONGCHONG; // 默认音色
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -54,6 +61,7 @@ public class MainActivity extends AppCompatActivity {
         requestPermissions();
         voiceUploadManager = new VoiceUploadManager();
         setupAudioList();
+        setupVoiceTypeSpinner();
     }
 
     private void initServices() {
@@ -154,7 +162,8 @@ public class MainActivity extends AppCompatActivity {
             
             recordingStatusText.setText("正在处理...");
             voiceUploadManager.cloneVoice(
-                new File(audioRecordService.getCurrentFilePath()),
+                audioFile,
+                selectedVoiceType,
                 new VoiceUploadManager.VoiceCallback() {
                     @Override
                     public void onSuccess(byte[] audioData) {
@@ -178,6 +187,8 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
             );
+        } else {
+            Toast.makeText(this, "请先选择要转换的音频文件", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -295,6 +306,22 @@ public class MainActivity extends AppCompatActivity {
             }
         }
         audioListAdapter.setAudioItems(items);
+    }
+
+    private void setupVoiceTypeSpinner() {
+        voiceTypeSpinner = findViewById(R.id.voiceTypeSpinner);
+        ArrayAdapter<VoiceType> adapter = new ArrayAdapter<>(
+            this,
+            R.layout.item_voice_type,
+            VoiceType.values()
+        );
+        voiceTypeSpinner.setAdapter(adapter);
+        
+        voiceTypeSpinner.setText(VoiceType.CHONGCHONG.toString(), false);
+        
+        voiceTypeSpinner.setOnItemClickListener((parent, view, position, id) -> {
+            selectedVoiceType = VoiceType.values()[position];
+        });
     }
 
     @Override

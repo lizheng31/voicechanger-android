@@ -34,6 +34,9 @@ public class AudioRecordService {
         mediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
         mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
         mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
+        mediaRecorder.setAudioSamplingRate(16000);
+        mediaRecorder.setAudioChannels(1);
+        mediaRecorder.setAudioEncodingBitRate(32000);
         mediaRecorder.setOutputFile(recordFile.getAbsolutePath());
         mediaRecorder.prepare();
         mediaRecorder.start();

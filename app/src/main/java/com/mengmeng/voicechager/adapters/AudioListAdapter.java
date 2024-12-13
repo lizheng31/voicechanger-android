@@ -10,8 +10,10 @@ import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.mengmeng.voicechager.R;
 import com.mengmeng.voicechager.models.AudioItem;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import android.widget.Toast;
 
 public class AudioListAdapter extends RecyclerView.Adapter<AudioListAdapter.ViewHolder> {
     private List<AudioItem> audioItems = new ArrayList<>();
@@ -115,5 +117,14 @@ public class AudioListAdapter extends RecyclerView.Adapter<AudioListAdapter.View
 
     public List<AudioItem> getAudioItems() {
         return audioItems;
+    }
+
+    public void onPlayClick(AudioItem item, MaterialButton playButton) {
+        File audioFile = new File(item.getPath());
+        if (!audioFile.exists()) {
+            Toast.makeText(playButton.getContext(), "音频文件不存在", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        // ... 其他播放逻辑 ...
     }
 } 

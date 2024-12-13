@@ -2,6 +2,7 @@ package com.mengmeng.voicechager.utils;
 
 import com.mengmeng.voicechager.api.ApiClient;
 import com.mengmeng.voicechager.api.VoiceWebSocketManager;
+import com.mengmeng.voicechager.models.VoiceType;
 import java.io.File;
 
 public class VoiceUploadManager {
@@ -12,7 +13,7 @@ public class VoiceUploadManager {
         void onError(String error);
     }
     
-    public void cloneVoice(File audioFile, VoiceCallback callback) {
+    public void cloneVoice(File audioFile, VoiceType voiceType, VoiceCallback callback) {
         // 读取音频文件
         byte[] audioData = readAudioFile(audioFile);
         if (audioData == null) {
@@ -38,7 +39,7 @@ public class VoiceUploadManager {
                 webSocketManager.sendAudio(audioData);
                 webSocketManager.sendEndFrame();
             }
-        });
+        }, voiceType);
         
         // 连接WebSocket
         webSocketManager.connect();
