@@ -1,42 +1,47 @@
 package com.mengmeng.voicechager.api;
 
+import com.mengmeng.voicechager.utils.LogUtils;
 import okhttp3.OkHttpClient;
-import retrofit2.Retrofit;
-import retrofit2.converter.gson.GsonConverterFactory;
+import okhttp3.logging.HttpLoggingInterceptor;
 import java.util.concurrent.TimeUnit;
 
 public class ApiClient {
-    private static final String BASE_URL = "http://direct.virtaicloud.com:29896/";
-    private static final String API_KEY = "your_api_key_here"; // 替换为实际的API密钥
+    private static final String WS_URL = "wss://cn-huadong-1.xf-yun.com/v1/private/s5e668773";
+    private static final String APP_ID = "e57180ee";
+    private static final String API_KEY = "b0e1787a1677ade1b9def9d49125e764";
+    private static final String API_SECRET = "YWM0OTI5MzQwNWFiNzExNzhhY2FhMzkw";
 
-    private static Retrofit retrofit = null;
-    private static VoiceService voiceService = null;
+    private static OkHttpClient client = null;
 
-    public static VoiceService getVoiceService() {
-        if (voiceService == null) {
-            voiceService = getClient().create(VoiceService.class);
-        }
-        return voiceService;
-    }
+    public static OkHttpClient getClient() {
+        if (client == null) {
+            HttpLoggingInterceptor loggingInterceptor = new HttpLoggingInterceptor(message -> 
+                LogUtils.d("OkHttp: " + message));
+            loggingInterceptor.setLevel(HttpLoggingInterceptor.Level.BODY);
 
-    private static Retrofit getClient() {
-        if (retrofit == null) {
-            OkHttpClient client = new OkHttpClient.Builder()
+            client = new OkHttpClient.Builder()
+                .addInterceptor(loggingInterceptor)
                 .connectTimeout(60, TimeUnit.SECONDS)
                 .readTimeout(60, TimeUnit.SECONDS)
                 .writeTimeout(60, TimeUnit.SECONDS)
                 .build();
-
-            retrofit = new Retrofit.Builder()
-                .baseUrl(BASE_URL)
-                .client(client)
-                .addConverterFactory(GsonConverterFactory.create())
-                .build();
         }
-        return retrofit;
+        return client;
     }
 
-    public static String getAuthorizationHeader() {
-        return "Bearer " + API_KEY;
+    public static String getAppId() {
+        return APP_ID;
+    }
+
+    public static String getApiKey() {
+        return API_KEY;
+    }
+
+    public static String getApiSecret() {
+        return API_SECRET;
+    }
+
+    public static String getWsUrl() {
+        return WS_URL;
     }
 } 

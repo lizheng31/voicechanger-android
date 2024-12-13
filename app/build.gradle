@@ -22,8 +22,8 @@ android {
     }
     
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
     }
 }
 
@@ -42,4 +42,11 @@ dependencies {
     
     // 权限处理
     implementation 'com.guolindev.permissionx:permissionx:1.7.1'
+    
+    // 添加日志库
+    implementation 'com.orhanobut:logger:2.2.0'
+    implementation 'com.squareup.okhttp3:logging-interceptor:4.9.1'
+    
+    // WebSocket support
+    implementation 'com.squareup.okhttp3:okhttp:4.9.1'
 }

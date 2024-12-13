@@ -1,89 +1,66 @@
 package com.mengmeng.voicechager.utils;
 
 import com.mengmeng.voicechager.api.ApiClient;
-import com.mengmeng.voicechager.models.VoiceListResponse;
-import com.mengmeng.voicechager.models.VoiceResponse;
-import okhttp3.MediaType;
-import okhttp3.MultipartBody;
-import okhttp3.RequestBody;
-import retrofit2.Call;
-import retrofit2.Callback;
+import com.mengmeng.voicechager.api.VoiceWebSocketManager;
 import java.io.File;
 
 public class VoiceUploadManager {
-    private static final String DEFAULT_SPEAKER = "speaker_1"; // 默认音色
-    private static final String DEFAULT_LANGUAGE = "zh"; // 默认语言
-
-    public interface CloneCallback {
-        void onSuccess(String audioUrl, String taskId);
-        void onFailure(String error);
+    private VoiceWebSocketManager webSocketManager;
+    
+    public interface VoiceCallback {
+        void onSuccess(byte[] audioData);
+        void onError(String error);
     }
-
-    public interface SpeakerListCallback {
-        void onSuccess(VoiceListResponse.Speaker[] speakers);
-        void onFailure(String error);
-    }
-
-    public void cloneVoice(File audioFile, String text, CloneCallback callback) {
-        try {
-            RequestBody audioRequestBody = RequestBody.create(
-                MediaType.parse("audio/*"), 
-                audioFile
-            );
+    
+    public void cloneVoice(File audioFile, VoiceCallback callback) {
+        // 读取音频文件
+        byte[] audioData = readAudioFile(audioFile);
+        if (audioData == null) {
+            callback.onError("Failed to read audio file");
+            return;
+        }
+        
+        // 创建WebSocket管理器
+        webSocketManager = new VoiceWebSocketManager(new VoiceWebSocketManager.VoiceCallback() {
+            @Override
+            public void onSuccess(byte[] convertedAudio) {
+                callback.onSuccess(convertedAudio);
+            }
             
-            MultipartBody.Part audioPart = MultipartBody.Part.createFormData(
-                "audio", 
-                audioFile.getName(), 
-                audioRequestBody
-            );
-
-            ApiClient.getVoiceService().cloneVoice(
-                ApiClient.getAuthorizationHeader(),
-                audioPart,
-                DEFAULT_SPEAKER,
-                text,
-                DEFAULT_LANGUAGE
-            ).enqueue(new Callback<VoiceResponse>() {
-                @Override
-                public void onResponse(Call<VoiceResponse> call, retrofit2.Response<VoiceResponse> response) {
-                    if (response.isSuccessful() && response.body() != null) {
-                        VoiceResponse.AudioData data = response.body().getData();
-                        if (data != null) {
-                            callback.onSuccess(data.getAudioUrl(), data.getTaskId());
-                        } else {
-                            callback.onFailure("No data in response");
-                        }
-                    } else {
-                        callback.onFailure("Clone failed: " + response.message());
-                    }
-                }
-
-                @Override
-                public void onFailure(Call<VoiceResponse> call, Throwable t) {
-                    callback.onFailure("Clone error: " + t.getMessage());
-                }
-            });
+            @Override
+            public void onError(String error) {
+                callback.onError(error);
+            }
+            
+            @Override
+            public void onReady() {
+                // 连接就绪后发送音频数据
+                webSocketManager.sendAudio(audioData);
+                webSocketManager.sendEndFrame();
+            }
+        });
+        
+        // 连接WebSocket
+        webSocketManager.connect();
+    }
+    
+    private byte[] readAudioFile(File file) {
+        try {
+            java.io.FileInputStream fis = new java.io.FileInputStream(file);
+            byte[] data = new byte[(int) file.length()];
+            fis.read(data);
+            fis.close();
+            return data;
         } catch (Exception e) {
-            callback.onFailure("Clone error: " + e.getMessage());
+            LogUtils.e("Read audio file failed", e);
+            return null;
         }
     }
-
-    public void getSpeakerList(SpeakerListCallback callback) {
-        ApiClient.getVoiceService().getSpeakerList(ApiClient.getAuthorizationHeader())
-            .enqueue(new Callback<VoiceListResponse>() {
-                @Override
-                public void onResponse(Call<VoiceListResponse> call, retrofit2.Response<VoiceListResponse> response) {
-                    if (response.isSuccessful() && response.body() != null) {
-                        callback.onSuccess(response.body().getData().toArray(new VoiceListResponse.Speaker[0]));
-                    } else {
-                        callback.onFailure("Failed to get speaker list: " + response.message());
-                    }
-                }
-
-                @Override
-                public void onFailure(Call<VoiceListResponse> call, Throwable t) {
-                    callback.onFailure("Error getting speaker list: " + t.getMessage());
-                }
-            });
+    
+    public void close() {
+        if (webSocketManager != null) {
+            webSocketManager.close();
+            webSocketManager = null;
+        }
     }
 }

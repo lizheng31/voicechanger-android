@@ -26,6 +26,8 @@ import com.mengmeng.voicechager.adapters.AudioListAdapter;
 import com.mengmeng.voicechager.models.AudioItem;
 import android.widget.Toast;
 import com.google.android.material.appbar.MaterialToolbar;
+import java.io.FileOutputStream;
+import android.util.Log;
 
 public class MainActivity extends AppCompatActivity {
     private MaterialButton recordButton;
@@ -152,31 +154,52 @@ public class MainActivity extends AppCompatActivity {
             
             recordingStatusText.setText("正在处理...");
             voiceUploadManager.cloneVoice(
-                audioFile,
-                "这是一段测试录音",
-                new VoiceUploadManager.CloneCallback() {
+                new File(audioRecordService.getCurrentFilePath()),
+                new VoiceUploadManager.VoiceCallback() {
                     @Override
-                    public void onSuccess(String audioUrl, String taskId) {
+                    public void onSuccess(byte[] audioData) {
                         runOnUiThread(() -> {
-                            recordingStatusText.setText("变声成功！");
-                            Toast.makeText(MainActivity.this, 
-                                "变声成功，音频URL：" + audioUrl, 
-                                Toast.LENGTH_SHORT).show();
-                            // TODO: 下载或播放变声后的音频
+                            // 保存转换后的音频数据
+                            String convertedFilePath = saveConvertedAudio(audioData);
+                            if (convertedFilePath != null) {
+                                recordingStatusText.setText("变声完成");
+                                loadAudioList();
+                            } else {
+                                recordingStatusText.setText("保存失败");
+                            }
                         });
                     }
 
                     @Override
-                    public void onFailure(String error) {
+                    public void onError(String error) {
                         runOnUiThread(() -> {
-                            recordingStatusText.setText("变声失败");
-                            Toast.makeText(MainActivity.this, 
-                                "变声失败：" + error,
-                                Toast.LENGTH_SHORT).show();
+                            recordingStatusText.setText("变声失败: " + error);
                         });
                     }
                 }
             );
+        }
+    }
+
+    private String saveConvertedAudio(byte[] audioData) {
+        try {
+            File outputDir = new File(getExternalFilesDir(Environment.DIRECTORY_MUSIC), "Converted");
+            if (!outputDir.exists()) {
+                outputDir.mkdirs();
+            }
+
+            String fileName = "converted_" + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
+                .format(new Date()) + ".wav";
+            File outputFile = new File(outputDir, fileName);
+
+            FileOutputStream fos = new FileOutputStream(outputFile);
+            fos.write(audioData);
+            fos.close();
+
+            return outputFile.getAbsolutePath();
+        } catch (Exception e) {
+            Log.e("MainActivity", "Save converted audio failed", e);
+            return null;
         }
     }
 
