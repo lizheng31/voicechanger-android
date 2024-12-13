@@ -25,6 +25,19 @@ public class VoiceUploadManager {
         webSocketManager = new VoiceWebSocketManager(new VoiceWebSocketManager.VoiceCallback() {
             @Override
             public void onSuccess(byte[] convertedAudio) {
+                // 验证音频数据
+                if (convertedAudio == null || convertedAudio.length == 0) {
+                    callback.onError("接收到的音频数据无效");
+                    return;
+                }
+                
+                // 检查音频数据的基本格式
+                if (convertedAudio.length < 44) { // WAV头至少44字节
+                    LogUtils.d("接收到的音频数据可能不是WAV格式，尝试添加WAV头");
+                } else {
+                    LogUtils.d("接收到音频数据: " + convertedAudio.length + " bytes");
+                }
+                
                 callback.onSuccess(convertedAudio);
             }
             

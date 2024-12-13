@@ -313,21 +313,14 @@ public class VoiceWebSocketManager extends WebSocketListener {
                     int status = result.optInt("status", -1);
                     int seq = result.optInt("seq", -1);
                     String audioBase64 = result.optString("audio", "");
-                    int frameSize = result.optInt("frame_size", 0);
-                    
-                    LogUtils.d("音频信息详情:");
-                    LogUtils.d("- 编码格式: " + encoding);
-                    LogUtils.d("- 采样率: " + sampleRate);
-                    LogUtils.d("- 声道数: " + channels);
-                    LogUtils.d("- 位深: " + bitDepth);
-                    LogUtils.d("- 状态: " + status);
-                    LogUtils.d("- 序号: " + seq);
-                    LogUtils.d("- 帧大小: " + frameSize);
                     
                     // 如果包含音频数据，进行处理
                     if (!audioBase64.isEmpty()) {
                         byte[] audioData = android.util.Base64.decode(audioBase64, android.util.Base64.NO_WRAP);
-                        callback.onSuccess(audioData);
+                        // 确保音频数据有效
+                        if (audioData != null && audioData.length > 0) {
+                            callback.onSuccess(audioData);
+                        }
                     }
                     
                     // 根据状态处理业务逻辑
@@ -340,7 +333,7 @@ public class VoiceWebSocketManager extends WebSocketListener {
                             break;
                         case 2:
                             LogUtils.d("音频处理完成");
-                            close();
+                            close(); // 处理完成后关闭连接
                             break;
                         default:
                             LogUtils.e("未知状态: " + status);

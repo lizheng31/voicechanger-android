@@ -33,6 +33,11 @@ import android.widget.ArrayAdapter;
 import android.widget.AdapterView;
 import com.mengmeng.voicechager.models.VoiceType;
 import android.widget.AutoCompleteTextView;
+import java.util.Collections;
+import com.mengmeng.voicechager.utils.LogUtils;
+import android.content.Intent;
+import android.provider.Settings;
+import android.os.Build;
 
 public class MainActivity extends AppCompatActivity {
     private MaterialButton recordButton;
@@ -67,16 +72,12 @@ public class MainActivity extends AppCompatActivity {
     private void initServices() {
         audioRecordService = new AudioRecordService(this);
         audioPlayerManager = new AudioPlayerManager();
-        audioPlayerManager.setOnPlaybackCompleteListener(() -> {
-            runOnUiThread(() -> {
-                convertButton.setText("变声");
-            });
-        });
     }
 
     private void initViews() {
         recordButton = findViewById(R.id.recordButton);
         convertButton = findViewById(R.id.convertButton);
+        convertButton.setText("变声");
         recordingStatusText = findViewById(R.id.recordingStatusText);
         recordingTimer = findViewById(R.id.recordingTimer);
 
@@ -100,9 +101,7 @@ public class MainActivity extends AppCompatActivity {
         });
 
         convertButton.setOnClickListener(v -> {
-            if (selectedAudioItem != null) {
-                uploadVoice(selectedAudioItem.getPath());
-            }
+            handleVoiceConversion();
         });
     }
 
@@ -110,21 +109,27 @@ public class MainActivity extends AppCompatActivity {
         List<String> permissions = new ArrayList<>();
         permissions.add(Manifest.permission.RECORD_AUDIO);
         
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            permissions.add(Manifest.permission.READ_MEDIA_AUDIO);
-        } else {
-            permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
-            permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
-        }
-
         PermissionX.init(this)
             .permissions(permissions)
             .request((allGranted, grantedList, deniedList) -> {
                 if (!allGranted) {
                     Toast.makeText(this, "需要录音和存储权限才能使用此功能", Toast.LENGTH_SHORT).show();
                     finish();
+                } else {
+                    createRequiredDirectories();
                 }
             });
+    }
+
+    private void createRequiredDirectories() {
+        try {
+            File voicechagerDir = new File(getExternalFilesDir(Environment.DIRECTORY_MUSIC), "voicechager");
+            if (!voicechagerDir.exists() && !voicechagerDir.mkdirs()) {
+                LogUtils.e("无法创建音频目录");
+            }
+        } catch (Exception e) {
+            LogUtils.e("创建目录失败", e);
+        }
     }
 
     private void startRecording() {
@@ -149,7 +154,54 @@ public class MainActivity extends AppCompatActivity {
         recordingStatusText.setText("录音完成");
         recordingTimer.stop();
         recordingTimer.setVisibility(View.GONE);
+        LogUtils.d("录音完成，刷新列表");
         loadAudioList();
+    }
+
+    private void handleVoiceConversion() {
+        // 获取中的音频文件
+        AudioItem selectedItem = audioListAdapter.getSelectedItem();
+        if (selectedItem == null) {
+            Toast.makeText(this, "请���选择要变声的音频文件", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        // 检查是否已经是变声后的文件
+        if (selectedItem.isConverted()) {
+            Toast.makeText(this, "该文件已经是变声后的文件", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // 获取选中的变声类型
+        String selectedText = voiceTypeSpinner.getText().toString();
+        VoiceType selectedVoiceType = null;
+        for (VoiceType type : VoiceType.values()) {
+            if (type.toString().equals(selectedText)) {
+                selectedVoiceType = type;
+                break;
+            }
+        }
+        
+        if (selectedVoiceType == null) {
+            Toast.makeText(this, "请选择变声类型", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // 检查是否已存在相同变声类型的文件
+        String expectedFileName = "chongchong_" + selectedItem.getId() + "_" + selectedVoiceType.getCode();
+        for (AudioItem item : audioListAdapter.getAudioItems()) {
+            if (item.getName().startsWith(expectedFileName)) {
+                Toast.makeText(this, "已存在相同变声类型的文件", Toast.LENGTH_SHORT).show();
+                return;
+            }
+        }
+
+        // 开始变声处理
+        convertButton.setEnabled(false);
+        recordingStatusText.setText("正在变声处理...");
+        
+        // 调用变声处理
+        uploadVoice(selectedItem.getPath());
     }
 
     private void uploadVoice(String filePath) {
@@ -161,6 +213,8 @@ public class MainActivity extends AppCompatActivity {
             }
             
             recordingStatusText.setText("正在处理...");
+            convertButton.setEnabled(false);
+            
             voiceUploadManager.cloneVoice(
                 audioFile,
                 selectedVoiceType,
@@ -168,14 +222,16 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onSuccess(byte[] audioData) {
                         runOnUiThread(() -> {
-                            // 保存转换后的音频数据
+                            // 存转换后的音频数据
                             String convertedFilePath = saveConvertedAudio(audioData);
                             if (convertedFilePath != null) {
                                 recordingStatusText.setText("变声完成");
+                                // 刷新音频列表
                                 loadAudioList();
                             } else {
                                 recordingStatusText.setText("保存失败");
                             }
+                            convertButton.setEnabled(true);
                         });
                     }
 
@@ -183,6 +239,10 @@ public class MainActivity extends AppCompatActivity {
                     public void onError(String error) {
                         runOnUiThread(() -> {
                             recordingStatusText.setText("变声失败: " + error);
+                            convertButton.setEnabled(true);
+                            Toast.makeText(MainActivity.this, 
+                                "变声失败：" + error, 
+                                Toast.LENGTH_SHORT).show();
                         });
                     }
                 }
@@ -194,24 +254,82 @@ public class MainActivity extends AppCompatActivity {
 
     private String saveConvertedAudio(byte[] audioData) {
         try {
-            File outputDir = new File(getExternalFilesDir(Environment.DIRECTORY_MUSIC), "Converted");
-            if (!outputDir.exists()) {
-                outputDir.mkdirs();
+            // 创建转换后的音频文件目录
+            File outputDir = new File(getExternalFilesDir(Environment.DIRECTORY_MUSIC), "voicechager");
+            if (!outputDir.exists() && !outputDir.mkdirs()) {
+                LogUtils.e("创建变声文件目录失败: " + outputDir.getAbsolutePath());
             }
 
-            String fileName = "converted_" + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
-                .format(new Date()) + ".wav";
+            if (!outputDir.canWrite()) {
+                throw new IOException("无法写入变声文件目录");
+            }
+
+            // 生成文件名，包含时间戳和音色信息
+            String fileName = String.format("converted_%s_%s.wav",
+                selectedVoiceType.getCode(),
+                new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date()));
+            
             File outputFile = new File(outputDir, fileName);
 
+            // 写入WAV文件头
             FileOutputStream fos = new FileOutputStream(outputFile);
+            
+            // WAV文件参数
+            final int SAMPLE_RATE = 24000;  // 采样率
+            final int CHANNELS = 1;         // 单声道
+            final int BITS_PER_SAMPLE = 16; // 位深度
+            final int BYTE_RATE = SAMPLE_RATE * CHANNELS * (BITS_PER_SAMPLE / 8);
+            final int BLOCK_ALIGN = CHANNELS * (BITS_PER_SAMPLE / 8);
+            
+            // RIFF header
+            writeString(fos, "RIFF"); // ChunkID
+            writeInt(fos, 36 + audioData.length); // ChunkSize
+            writeString(fos, "WAVE"); // Format
+            
+            // fmt subchunk
+            writeString(fos, "fmt "); // Subchunk1ID
+            writeInt(fos, 16); // Subchunk1Size
+            writeShort(fos, (short) 1); // AudioFormat (1 = PCM)
+            writeShort(fos, (short) CHANNELS); // NumChannels
+            writeInt(fos, SAMPLE_RATE); // SampleRate
+            writeInt(fos, BYTE_RATE); // ByteRate = SampleRate * NumChannels * (BitsPerSample / 8)
+            writeShort(fos, (short) BLOCK_ALIGN); // BlockAlign = NumChannels * (BitsPerSample / 8)
+            writeShort(fos, (short) BITS_PER_SAMPLE); // BitsPerSample
+            
+            // data subchunk
+            writeString(fos, "data"); // Subchunk2ID
+            writeInt(fos, audioData.length); // Subchunk2Size
+            
+            // 写入音频数据
             fos.write(audioData);
             fos.close();
 
+            LogUtils.d("保存音频文件: " + outputFile.getAbsolutePath() + 
+                ", 小: " + audioData.length + 
+                ", 采样率: " + SAMPLE_RATE);
+
             return outputFile.getAbsolutePath();
         } catch (Exception e) {
-            Log.e("MainActivity", "Save converted audio failed", e);
+            LogUtils.e("保存音频文件失败", e);
             return null;
         }
+    }
+
+    // 修改写入方法，确保按小端序写入
+    private void writeInt(FileOutputStream fos, int value) throws IOException {
+        fos.write(value & 0xFF);
+        fos.write((value >> 8) & 0xFF);
+        fos.write((value >> 16) & 0xFF);
+        fos.write((value >> 24) & 0xFF);
+    }
+
+    private void writeShort(FileOutputStream fos, short value) throws IOException {
+        fos.write(value & 0xFF);
+        fos.write((value >> 8) & 0xFF);
+    }
+
+    private void writeString(FileOutputStream fos, String value) throws IOException {
+        fos.write(value.getBytes());
     }
 
     private void setupAudioList() {
@@ -219,6 +337,7 @@ public class MainActivity extends AppCompatActivity {
         audioListView.setLayoutManager(new LinearLayoutManager(this));
         
         audioListAdapter = new AudioListAdapter();
+        audioListAdapter.setAudioPlayerManager(audioPlayerManager);
         audioListView.setAdapter(audioListAdapter);
         
         audioListAdapter.setOnItemClickListener(new AudioListAdapter.OnItemClickListener() {
@@ -287,25 +406,84 @@ public class MainActivity extends AppCompatActivity {
 
     private void loadAudioList() {
         List<AudioItem> items = new ArrayList<>();
-        File recordingsDir = new File(getExternalFilesDir(Environment.DIRECTORY_MUSIC), "Recordings");
-        if (recordingsDir.exists()) {
-            File[] files = recordingsDir.listFiles();
-            if (files != null) {
-                for (File file : files) {
-                    String name = file.getName();
-                    String date = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-                            .format(new Date(file.lastModified()));
-                    items.add(new AudioItem(
-                        file.getAbsolutePath(),
-                        name,
-                        file.getAbsolutePath(),
-                        date,
-                        false
-                    ));
+        
+        // 加载音频文件目录
+        File audioDir = new File(getExternalFilesDir(Environment.DIRECTORY_MUSIC), "voicechager");
+        LogUtils.d("加载音频目录: " + audioDir.getAbsolutePath());
+        LogUtils.d("音频目录是否存在: " + audioDir.exists());
+        if (audioDir.exists()) {
+            File[] audioFiles = audioDir.listFiles();
+            LogUtils.d("音频文件数量: " + (audioFiles != null ? audioFiles.length : 0));
+            if (audioFiles != null) {
+                for (File file : audioFiles) {
+                    LogUtils.d("检查文件: " + file.getName() + ", 大小: " + file.length());
+                    if (file.getName().startsWith("converted_")) {
+                        // 处理变声文件
+                        String name = file.getName();
+                        String date = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+                                .format(new Date(file.lastModified()));
+                        
+                        String voiceType = null;
+                        String[] parts = name.split("_");
+                        if (parts.length > 1) {
+                            voiceType = getVoiceTypeDisplayName(parts[1]);
+                        }
+                        
+                        LogUtils.d("添加变声文件: " + name + ", 音色: " + voiceType);
+                        items.add(new AudioItem(
+                            file.getAbsolutePath(),
+                            name.replace("converted_", "变声: "),
+                            file.getAbsolutePath(),
+                            date,
+                            true,
+                            voiceType
+                        ));
+                    } else if (file.getName().endsWith(".mp3")) {
+                        // 处理录音文件
+                        String name = file.getName();
+                        String date = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+                                .format(new Date(file.lastModified()));
+                        LogUtils.d("添加录音文件: " + name);
+                        items.add(new AudioItem(
+                            file.getAbsolutePath(),
+                            "原声: " + name,
+                            file.getAbsolutePath(),
+                            date,
+                            false
+                        ));
+                    }
                 }
             }
         }
+        
+        // 按时间倒序排序
+        Collections.sort(items, (a, b) -> {
+            try {
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
+                Date dateA = sdf.parse(a.getDate());
+                Date dateB = sdf.parse(b.getDate());
+                return dateB.compareTo(dateA);
+            } catch (Exception e) {
+                return 0;
+            }
+        });
+        
+        LogUtils.d("加载音频列表: " + items.size() + " 个文件");
+        for (AudioItem item : items) {
+            LogUtils.d("音频文件: " + item.getPath());
+        }
+        
         audioListAdapter.setAudioItems(items);
+    }
+
+    // 获取变声类型的显示名称
+    private String getVoiceTypeDisplayName(String code) {
+        for (VoiceType type : VoiceType.values()) {
+            if (type.getCode().equals(code)) {
+                return type.getDescription();
+            }
+        }
+        return code;
     }
 
     private void setupVoiceTypeSpinner() {
@@ -327,7 +505,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        audioPlayerManager.stopAudio();
+        audioPlayerManager.release();
         if (isRecording) {
             audioRecordService.stopRecording();
         }

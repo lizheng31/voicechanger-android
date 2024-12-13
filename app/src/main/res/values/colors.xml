@@ -37,4 +37,6 @@
     <color name="error">#BA1A1A</color>
     <color name="selected_item_color">#91D8CE</color>
     <color name="default_item_color">#FFFFFFFF</color>
+    <color name="original_audio_background">#FFFFFF</color>
+    <color name="converted_audio_background">#E8F5E9</color>
 </resources>
