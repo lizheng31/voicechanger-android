@@ -2,6 +2,8 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    
+    <!-- Material Theme Colors -->
     <color name="md_theme_light_primary">#006C4C</color>
     <color name="md_theme_light_onPrimary">#FFFFFF</color>
     <color name="md_theme_light_primaryContainer">#89F8C7</color>
@@ -33,10 +35,17 @@
     <color name="md_theme_light_outlineVariant">#BFC9C2</color>
     <color name="md_theme_light_scrim">#000000</color>
 
+    <!-- App Theme Colors -->
     <color name="seed">#006C4C</color>
     <color name="error">#BA1A1A</color>
-    <color name="selected_item_color">#91D8CE</color>
-    <color name="default_item_color">#FFFFFFFF</color>
+
+    <!-- List Item Colors -->
+    <color name="selected_item_background">#E8F5E9</color>
+    <color name="selected_item_stroke">#006C4C</color>
     <color name="original_audio_background">#FFFFFF</color>
-    <color name="converted_audio_background">#E8F5E9</color>
+    <color name="converted_audio_background">#F5F5F5</color>
+
+    <!-- Text Colors -->
+    <color name="text_primary">#006C4C</color>
+    <color name="text_secondary">#666666</color>
 </resources>

@@ -16,12 +16,13 @@ import java.util.ArrayList;
 import java.util.List;
 import android.widget.Toast;
 import android.content.res.ColorStateList;
+import java.util.Locale;
 
 public class AudioListAdapter extends RecyclerView.Adapter<AudioListAdapter.ViewHolder> {
     private List<AudioItem> audioItems = new ArrayList<>();
-    private OnItemClickListener listener;
-    private AudioItem selectedItem = null;
+    private AudioItem selectedItem;
     private AudioPlayerManager audioPlayerManager;
+    private OnItemClickListener listener;
 
     public interface OnItemClickListener {
         void onPlayClick(AudioItem item, MaterialButton playButton);
@@ -49,54 +50,66 @@ public class AudioListAdapter extends RecyclerView.Adapter<AudioListAdapter.View
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         AudioItem item = audioItems.get(position);
         
-        // 设置音频名称
-        holder.audioNameText.setText(item.getDisplayName());
+        // 设置文件名和日期
+        holder.nameText.setText(item.getName());
+        holder.dateText.setText(item.getDate());
         
-        // 设置日期
-        holder.audioDateText.setText(item.getDate());
+        // 设置文件大小
+        File file = new File(item.getPath());
+        String fileSize = formatFileSize(file.length());
+        holder.sizeText.setText(fileSize);
         
-        // 根据是否是变声文件和选中状态设置不同的背景色
-        int backgroundColor;
-        if (item == selectedItem) {
-            backgroundColor = holder.itemView.getContext().getColor(R.color.selected_item_color);
-        } else if (item.isConverted()) {
-            backgroundColor = holder.itemView.getContext().getColor(R.color.converted_audio_background);
-        } else {
-            backgroundColor = holder.itemView.getContext().getColor(R.color.default_item_color);
-        }
-        holder.itemView.setBackgroundTintList(ColorStateList.valueOf(backgroundColor));
-        
-        // 设置播放按钮状态
-        if (audioPlayerManager != null && 
-            audioPlayerManager.isPlaying() && 
-            item.getPath().equals(audioPlayerManager.getCurrentAudioPath())) {
-            holder.playButton.setIconResource(android.R.drawable.ic_media_pause);
-        } else {
-            holder.playButton.setIconResource(android.R.drawable.ic_media_play);
-        }
-        
-        // 设置选中状态
-        holder.itemView.setSelected(selectedItem != null && 
+        // 设置卡片选中状态
+        boolean isSelected = (selectedItem != null && 
             selectedItem.getPath().equals(item.getPath()));
+        
+        // 设置选中状态的视觉效果
+        holder.cardView.setChecked(isSelected);
+        if (isSelected) {
+            // 选中状态：深色边框，浅色背景
+            holder.cardView.setStrokeColor(
+                holder.cardView.getContext().getColor(R.color.selected_item_stroke));
+            holder.cardView.setStrokeWidth(2);
+            holder.cardView.setCardElevation(4f);
+            holder.cardView.setCardBackgroundColor(
+                holder.cardView.getContext().getColor(R.color.selected_item_background));
+            holder.nameText.setTextColor(
+                holder.cardView.getContext().getColor(R.color.text_primary));
+        } else {
+            // 未选中状态：恢复默认
+            holder.cardView.setStrokeColor(
+                holder.cardView.getContext().getColor(R.color.md_theme_light_outline));
+            holder.cardView.setStrokeWidth(1);
+            holder.cardView.setCardElevation(2f);
+            holder.cardView.setCardBackgroundColor(item.isConverted() ? 
+                holder.cardView.getContext().getColor(R.color.converted_audio_background) : 
+                holder.cardView.getContext().getColor(R.color.original_audio_background));
+            holder.nameText.setTextColor(
+                holder.cardView.getContext().getColor(R.color.md_theme_light_onSurface));
+        }
 
-        holder.itemView.setOnClickListener(v -> {
-            AudioItem oldSelection = selectedItem;
-            selectedItem = item;
-            if (oldSelection != null) {
-                notifyItemChanged(audioItems.indexOf(oldSelection));
+        // 点击整个卡片的处理
+        holder.cardView.setOnClickListener(v -> {
+            // 如果点击已选中的项目，则取消选择
+            if (isSelected) {
+                setSelectedItem(null);
+            } else {
+                setSelectedItem(item);
             }
-            notifyItemChanged(position);
+            
             if (listener != null) {
-                listener.onItemSelected(item);
+                listener.onItemSelected(selectedItem);
             }
         });
 
+        // 播放按钮处理
         holder.playButton.setOnClickListener(v -> {
             if (listener != null) {
                 listener.onPlayClick(item, holder.playButton);
             }
         });
 
+        // 删除按钮处理
         holder.deleteButton.setOnClickListener(v -> {
             if (listener != null) {
                 listener.onDeleteClick(item);
@@ -104,24 +117,20 @@ public class AudioListAdapter extends RecyclerView.Adapter<AudioListAdapter.View
         });
     }
 
+    // 格式化文件大小
+    private String formatFileSize(long size) {
+        if (size < 1024) {
+            return size + " B";
+        } else if (size < 1024 * 1024) {
+            return String.format(Locale.getDefault(), "%.1f KB", size / 1024f);
+        } else {
+            return String.format(Locale.getDefault(), "%.1f MB", size / (1024f * 1024f));
+        }
+    }
+
     @Override
     public int getItemCount() {
         return audioItems.size();
-    }
-
-    class ViewHolder extends RecyclerView.ViewHolder {
-        TextView audioNameText;
-        TextView audioDateText;
-        MaterialButton playButton;
-        MaterialButton deleteButton;
-
-        ViewHolder(View itemView) {
-            super(itemView);
-            audioNameText = itemView.findViewById(R.id.audioNameText);
-            audioDateText = itemView.findViewById(R.id.audioDateText);
-            playButton = itemView.findViewById(R.id.playButton);
-            deleteButton = itemView.findViewById(R.id.deleteButton);
-        }
     }
 
     public AudioItem getSelectedItem() {
@@ -131,11 +140,21 @@ public class AudioListAdapter extends RecyclerView.Adapter<AudioListAdapter.View
     public void setSelectedItem(AudioItem item) {
         AudioItem oldSelection = selectedItem;
         selectedItem = item;
+        
+        // 更新旧选中项的视图
         if (oldSelection != null) {
-            notifyItemChanged(audioItems.indexOf(oldSelection));
+            int oldIndex = audioItems.indexOf(oldSelection);
+            if (oldIndex != -1) {
+                notifyItemChanged(oldIndex);
+            }
         }
+        
+        // 更新新选中项的视图
         if (item != null) {
-            notifyItemChanged(audioItems.indexOf(item));
+            int newIndex = audioItems.indexOf(item);
+            if (newIndex != -1) {
+                notifyItemChanged(newIndex);
+            }
         }
     }
 
@@ -154,5 +173,24 @@ public class AudioListAdapter extends RecyclerView.Adapter<AudioListAdapter.View
 
     public void setAudioPlayerManager(AudioPlayerManager audioPlayerManager) {
         this.audioPlayerManager = audioPlayerManager;
+    }
+
+    public static class ViewHolder extends RecyclerView.ViewHolder {
+        MaterialCardView cardView;
+        TextView nameText;
+        TextView dateText;
+        TextView sizeText;
+        MaterialButton playButton;
+        MaterialButton deleteButton;
+
+        public ViewHolder(View view) {
+            super(view);
+            cardView = (MaterialCardView) view;
+            nameText = view.findViewById(R.id.audioNameText);
+            dateText = view.findViewById(R.id.audioDateText);
+            sizeText = view.findViewById(R.id.audioSizeText);
+            playButton = view.findViewById(R.id.playButton);
+            deleteButton = view.findViewById(R.id.deleteButton);
+        }
     }
 } 

@@ -15,15 +15,11 @@ public class ApiClient {
 
     public static OkHttpClient getClient() {
         if (client == null) {
-            HttpLoggingInterceptor loggingInterceptor = new HttpLoggingInterceptor(message -> 
-                LogUtils.d("OkHttp: " + message));
-            loggingInterceptor.setLevel(HttpLoggingInterceptor.Level.BODY);
-
             client = new OkHttpClient.Builder()
-                .addInterceptor(loggingInterceptor)
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .readTimeout(180, TimeUnit.SECONDS)
                 .writeTimeout(60, TimeUnit.SECONDS)
+                .hostnameVerifier((hostname, session) -> true)
                 .build();
         }
         return client;

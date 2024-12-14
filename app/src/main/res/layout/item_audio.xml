@@ -6,17 +6,23 @@
     android:layout_height="wrap_content"
     android:layout_marginHorizontal="8dp"
     android:layout_marginVertical="4dp"
-    android:checkable="false"
-    app:cardBackgroundColor="@color/card_background_color"
+    android:checkable="true"
+    android:clickable="true"
+    android:focusable="true"
+    android:foreground="?attr/selectableItemBackground"
+    app:cardElevation="2dp"
     app:strokeWidth="1dp"
-    app:strokeColor="?attr/colorOutline"
+    app:cardCornerRadius="8dp"
+    app:checkedIcon="@null"
+    app:rippleColor="@color/selected_item_background"
     style="@style/Widget.Material3.CardView.Outlined">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:padding="16dp">
+        android:padding="12dp"
+        android:gravity="center_vertical">
 
         <LinearLayout
             android:layout_width="0dp"
@@ -28,29 +34,72 @@
                 android:id="@+id/audioNameText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textAppearance="@style/TextAppearance.Material3.TitleMedium"/>
+                android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+                android:maxLines="1"
+                android:ellipsize="end"/>
 
-            <TextView
-                android:id="@+id/audioDateText"
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"/>
+                android:orientation="horizontal"
+                android:layout_marginTop="4dp">
+
+                <TextView
+                    android:id="@+id/audioDateText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textAppearance="@style/TextAppearance.Material3.BodySmall"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text=" • "
+                    android:textAppearance="@style/TextAppearance.Material3.BodySmall"/>
+
+                <TextView
+                    android:id="@+id/audioSizeText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textAppearance="@style/TextAppearance.Material3.BodySmall"/>
+            </LinearLayout>
         </LinearLayout>
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/playButton"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginEnd="8dp"
-            app:icon="@android:drawable/ic_media_play"
-            style="@style/Widget.Material3.Button.IconButton"/>
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/deleteButton"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            app:icon="@android:drawable/ic_menu_delete"
-            style="@style/Widget.Material3.Button.IconButton.Outlined"/>
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/playButton"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="8dp"
+                android:insetLeft="0dp"
+                android:insetTop="0dp"
+                android:insetRight="0dp"
+                android:insetBottom="0dp"
+                android:padding="8dp"
+                app:icon="@android:drawable/ic_media_play"
+                app:iconGravity="textStart"
+                app:iconPadding="0dp"
+                app:iconTint="?attr/colorOnSurface"
+                style="@style/Widget.Material3.Button.IconButton.Outlined"/>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/deleteButton"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:insetLeft="0dp"
+                android:insetTop="0dp"
+                android:insetRight="0dp"
+                android:insetBottom="0dp"
+                android:padding="8dp"
+                app:icon="@android:drawable/ic_menu_delete"
+                app:iconGravity="textStart"
+                app:iconPadding="0dp"
+                app:iconTint="?attr/colorError"
+                style="@style/Widget.Material3.Button.IconButton.Outlined"/>
+        </LinearLayout>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView> 
