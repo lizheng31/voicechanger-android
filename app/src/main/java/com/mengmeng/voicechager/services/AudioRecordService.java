@@ -27,7 +27,7 @@ public class AudioRecordService {
             recordDir.mkdirs();
         }
 
-        // 创建录音文件
+        // 创建录音文件 - 使用 MP3 格式
         File recordFile = new File(recordDir, 
             "record_" + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
                 .format(new Date()) + ".mp3"
@@ -42,14 +42,14 @@ public class AudioRecordService {
             mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
             mediaRecorder.setAudioSamplingRate(16000);
             mediaRecorder.setAudioChannels(1);
-            mediaRecorder.setAudioEncodingBitRate(32000);
+            mediaRecorder.setAudioEncodingBitRate(128000);
             mediaRecorder.setOutputFile(recordFile.getAbsolutePath());
             mediaRecorder.prepare();
             mediaRecorder.start();
 
             currentFilePath = recordFile.getAbsolutePath();
             isRecording = true;
-            LogUtils.d("录音开始成功");
+            LogUtils.d("录音开始成功，格式：AAC，采样率：16kHz，位深：16bit，通道：单声道，比特率：128kbps");
         } catch (Exception e) {
             LogUtils.e("录音失败", e);
             throw e;

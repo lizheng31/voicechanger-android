@@ -14,6 +14,12 @@ import android.os.Handler;
 import android.os.Looper;
 import java.util.ArrayList;
 import java.util.List;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+import android.content.Context;
 
 public class VoiceWebSocketManager extends WebSocketListener {
     private WebSocket webSocket;
@@ -26,13 +32,16 @@ public class VoiceWebSocketManager extends WebSocketListener {
     // 添加音频缓存
     private List<byte[]> audioFrames = new ArrayList<>();
     
+    private final Context context;
+    
     public interface VoiceCallback {
         void onSuccess(byte[] audioData);
         void onError(String error);
         void onReady();
     }
     
-    public VoiceWebSocketManager(VoiceCallback callback, VoiceType voiceType) {
+    public VoiceWebSocketManager(Context context, VoiceCallback callback, VoiceType voiceType) {
+        this.context = context;
         this.callback = callback;
         this.voiceType = voiceType;
     }
@@ -67,61 +76,59 @@ public class VoiceWebSocketManager extends WebSocketListener {
         try {
             JSONObject frame = new JSONObject();
             
-            // header (必传)
+            // header
             JSONObject header = new JSONObject();
             header.put("app_id", ApiClient.getAppId());
-            header.put("status", 0);  // 0-开始
+            header.put("status", 0);
             frame.put("header", header);
             
-            // parameter (必传)
+            // parameter
             JSONObject parameter = new JSONObject();
             JSONObject xvc = new JSONObject();
-            
             xvc.put("voiceName", voiceType.getCode());
-            xvc.put("speed", 0);
-            xvc.put("volume", 0);
-            xvc.put("pitch", 0);
-            xvc.put("vocoder_mode", 0);
             
-            // result (必传) - 修改为回mp3格式
+            // result
             JSONObject result = new JSONObject();
-            result.put("encoding", "lame");        // 使用lame(mp3)编码
+            result.put("encoding", "lame");
             result.put("sample_rate", 16000);
             result.put("channels", 1);
             result.put("bit_depth", 16);
-            result.put("frame_size", 0);          // 使用默认帧大小
+            result.put("frame_size", 0);
             xvc.put("result", result);
             
             parameter.put("xvc", xvc);
             frame.put("parameter", parameter);
             
-            // payload (必传)
+            // payload
             JSONObject payload = new JSONObject();
             JSONObject inputAudio = new JSONObject();
-            inputAudio.put("encoding", "raw");    // 发送PCM原始数据
+            inputAudio.put("encoding", "lame");
             inputAudio.put("sample_rate", 16000);
             inputAudio.put("channels", 1);
             inputAudio.put("bit_depth", 16);
-            inputAudio.put("status", 0);
-            inputAudio.put("seq", 0);
-            inputAudio.put("frame_size", 0);      // 使用默认帧大小
+            inputAudio.put("frame_size", 0);
+            inputAudio.put("status", 0);  // 添加 status
+            inputAudio.put("seq", 0);     // 添加 seq
             payload.put("input_audio", inputAudio);
             frame.put("payload", payload);
             
             String message = frame.toString();
+            LogUtils.d("发送业务参数: " + message);
+            
             boolean sent = webSocket.send(message);
             if (!sent) {
                 callback.onError("业务参数发送失败");
                 return;
             }
-            LogUtils.d("开始发送音频数据...");
+            LogUtils.d("业务参数发送成功，音色类型: " + voiceType.getDescription());
         } catch (Exception e) {
+            LogUtils.e("发送业务参数失败: " + e.getMessage(), e);
             callback.onError("发送业务参数失败");
         }
     }
     
     public void sendAudio(byte[] audioData) {
-        LogUtils.d("准备��送音频数据大小: " + audioData.length + " 字节");
+        LogUtils.d("准备发送音频数据大小: " + audioData.length + " 字节");
         
         if (webSocket != null && isBusinessReady) {
             try {
@@ -130,9 +137,12 @@ public class VoiceWebSocketManager extends WebSocketListener {
                     return;
                 }
 
-                LogUtils.d("开始转换音色...");
+                LogUtils.d("开始转换色: " + voiceType.getDescription());
                 int offset = 0;
                 int frameCount = 0;
+                
+                LogUtils.d("音频编码参数: encoding=lame, sample_rate=16000, channels=1, bit_depth=16, frame_size=0");
+                
                 while (offset < audioData.length) {
                     int frameSize = Math.min(MAX_FRAME_SIZE, audioData.length - offset);
                     byte[] frameData = new byte[frameSize];
@@ -156,20 +166,23 @@ public class VoiceWebSocketManager extends WebSocketListener {
                     // payload
                     JSONObject payload = new JSONObject();
                     JSONObject inputAudio = new JSONObject();
-                    inputAudio.put("encoding", "raw");    // 保持输入为raw格式
+                    inputAudio.put("encoding", "lame");  // 使用 lame(MP3) ��式
                     inputAudio.put("sample_rate", 16000);
                     inputAudio.put("channels", 1);
                     inputAudio.put("bit_depth", 16);
-                    inputAudio.put("frame_size", 0);      // 使用默认帧大小,与初始化参数保持一致
+                    inputAudio.put("frame_size", 0);
                     inputAudio.put("status", offset + frameSize >= audioData.length ? 2 : 1);
                     inputAudio.put("seq", frameCount);
                     inputAudio.put("audio", base64Audio);
-                    
                     payload.put("input_audio", inputAudio);
                     frame.put("payload", payload);
                     
                     String message = frame.toString();
-                    if (frameCount % 50 == 0) { // 大幅减少进度日志
+                    if (frameCount == 0) {
+                        LogUtils.d("发送第一帧音频数据: " + message);
+                    }
+                    
+                    if (frameCount % 50 == 0) {
                         LogUtils.d(String.format("音频转换进度: %.1f%%", 
                             (float)offset / audioData.length * 100));
                     }
@@ -184,7 +197,10 @@ public class VoiceWebSocketManager extends WebSocketListener {
                     offset += frameSize;
                     frameCount++;
                 }
+                LogUtils.d(String.format("音频数据发送完成: 共发送 %d 帧，总大小 %d 字节，音色类型 %s", 
+                    frameCount, audioData.length, voiceType.getDescription()));
             } catch (Exception e) {
+                LogUtils.e("音频处理失败: " + e.getMessage(), e);
                 callback.onError("音频处理失败");
             }
         } else {
@@ -206,7 +222,7 @@ public class VoiceWebSocketManager extends WebSocketListener {
                 // payload
                 JSONObject payload = new JSONObject();
                 JSONObject inputAudio = new JSONObject();
-                inputAudio.put("encoding", "raw");    // 修改为raw格式
+                inputAudio.put("encoding", "lame");    // 改为 lame 格式
                 inputAudio.put("sample_rate", 16000);
                 inputAudio.put("channels", 1);
                 inputAudio.put("bit_depth", 16);
@@ -216,7 +232,9 @@ public class VoiceWebSocketManager extends WebSocketListener {
                 payload.put("input_audio", inputAudio);
                 frame.put("payload", payload);
                 
-                webSocket.send(frame.toString());
+                String message = frame.toString();
+                LogUtils.d("发送结束帧: " + message);  // 添加日志
+                webSocket.send(message);
             } catch (Exception e) {
                 LogUtils.e("结束处理失败", e);
             }
@@ -243,13 +261,17 @@ public class VoiceWebSocketManager extends WebSocketListener {
                 String message = header.optString("message", "未知错误");
                 int status = header.optInt("status", -1);
                 
+                // 只打印错误响应和初始化响应
                 if (code != 0) {
+                    LogUtils.d("收到错误响应: code=" + code + ", message=" + message);
+                    LogUtils.d("错误响应详情: " + text);  // 打印完整错误响应
                     callback.onError(message);
                     return;
                 }
 
                 if (status == 0 && code == 0) {
-                    LogUtils.d("开始接收音频数据...");
+                    LogUtils.d("音频服务初始化成功，开始接收数据...");
+                    LogUtils.d("初始化响应: " + text);  // 打印完整初始化响应
                     isBusinessReady = true;
                     callback.onReady();
                     return;
@@ -261,14 +283,20 @@ public class VoiceWebSocketManager extends WebSocketListener {
                 if (payload.has("result")) {
                     JSONObject result = payload.getJSONObject("result");
                     String encoding = result.optString("encoding", "");
-                    LogUtils.d("接收到音频数据格式: " + encoding); // 检查返回的音频格式
-                    
                     int status = result.optInt("status", -1);
                     String audioBase64 = result.optString("audio", "");
                     
+                    // 只在收到��一帧时打印音频格式信息和完成响应
+                    if (audioFrames.isEmpty()) {
+                        LogUtils.d("接收音频格式: encoding=" + encoding + 
+                                 ", sample_rate=" + result.optInt("sample_rate", 16000) +
+                                 ", channels=" + result.optInt("channels", 1) +
+                                 ", bit_depth=" + result.optInt("bit_depth", 16));
+                        LogUtils.d("第一帧响应: " + text);  // 打印第一帧完整响应
+                    }
+                    
                     if (!audioBase64.isEmpty()) {
                         byte[] audioData = android.util.Base64.decode(audioBase64, android.util.Base64.NO_WRAP);
-                        LogUtils.d("接收到音频帧大小: " + audioData.length + " 字节");
                         
                         // 缓存音频帧
                         audioFrames.add(audioData);
@@ -289,7 +317,9 @@ public class VoiceWebSocketManager extends WebSocketListener {
                                 offset += frame.length;
                             }
                             
-                            LogUtils.d("音频转换完成，总大小: " + completeAudio.length + " 字节");
+                            LogUtils.d(String.format("音频转换完成: 共收到 %d 帧，总大小 %d 字节", 
+                                audioFrames.size(), completeAudio.length));
+                            LogUtils.d("最后一帧响应: " + text);  // 打印最后一帧完整响应
                             
                             // 清空缓存
                             audioFrames.clear();
@@ -301,7 +331,8 @@ public class VoiceWebSocketManager extends WebSocketListener {
                 }
             }
         } catch (Exception e) {
-            LogUtils.e("处理响应失败: " + e.getMessage());
+            LogUtils.e("处理响应失败: " + e.getMessage(), e);
+            LogUtils.e("失败的响应数: " + text);  // 打印导致失败的响应数
             callback.onError("处理响应失败");
             audioFrames.clear(); // 发生错误时清空缓存
         }

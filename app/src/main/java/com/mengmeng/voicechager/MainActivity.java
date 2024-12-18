@@ -65,7 +65,7 @@ public class MainActivity extends AppCompatActivity {
         initViews();
         setupListeners();
         requestPermissions();
-        voiceUploadManager = new VoiceUploadManager();
+        voiceUploadManager = new VoiceUploadManager(this);
         setupAudioList();
         setupVoiceTypeSpinner();
     }
@@ -243,15 +243,9 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onSuccess(byte[] audioData) {
                         runOnUiThread(() -> {
-                            // 存转换后的音频数据
-                            String convertedFilePath = saveConvertedAudio(audioData);
-                            if (convertedFilePath != null) {
-                                recordingStatusText.setText("变声完成");
-                                // 刷新音频列表
-                                loadAudioList();
-                            } else {
-                                recordingStatusText.setText("保存失败");
-                            }
+                            recordingStatusText.setText("变声完成");
+                            // 刷新音频列表
+                            loadAudioList();
                             convertButton.setEnabled(true);
                         });
                     }
@@ -270,37 +264,6 @@ public class MainActivity extends AppCompatActivity {
             );
         } else {
             Toast.makeText(this, "请先选择要转换的音频文件", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private String saveConvertedAudio(byte[] audioData) {
-        try {
-            // 添加日志记录保存的音频大小
-            LogUtils.d("保存转换后的音频大小: " + audioData.length + " 字节");
-            
-            File outputDir = new File(getExternalFilesDir(null), "converted");
-            if (!outputDir.exists()) {
-                outputDir.mkdirs();
-            }
-
-            String fileName = "converted_" + new SimpleDateFormat("yyyyMMdd_HHmmss", 
-                Locale.getDefault()).format(new Date()) + ".mp3";
-            File outputFile = new File(outputDir, fileName);
-
-            FileOutputStream fos = new FileOutputStream(outputFile);
-            fos.write(audioData);
-            fos.close();
-
-            // 验证保存的文件
-            if (outputFile.exists()) {
-                LogUtils.d("音频文件已保存: " + outputFile.getAbsolutePath() + 
-                          ", 文件大小: " + outputFile.length() + " 字节");
-            }
-
-            return outputFile.getAbsolutePath();
-        } catch (Exception e) {
-            LogUtils.e("保存音频文件失败: " + e.getMessage());
-            return null;
         }
     }
 
