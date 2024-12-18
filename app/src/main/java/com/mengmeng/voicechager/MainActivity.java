@@ -39,6 +39,10 @@ import android.content.Intent;
 import android.provider.Settings;
 import android.os.Build;
 import android.view.MotionEvent;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.mengmeng.voicechager.services.VoiceAccessibilityService;
+import com.mengmeng.voicechager.services.VoiceMonitorService;
+import android.content.pm.PackageManager;
 
 public class MainActivity extends AppCompatActivity {
     private MaterialButton recordButton;
@@ -180,7 +184,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void handleVoiceConversion() {
-        // 获取选中的音频文件
+        // 获取选中的音文件
         AudioItem selectedItem = audioListAdapter.getSelectedItem();
         if (selectedItem == null) {
             Toast.makeText(this, "请选择要变声的音频文件", Toast.LENGTH_SHORT).show();
@@ -329,6 +333,26 @@ public class MainActivity extends AppCompatActivity {
                     }
                     loadAudioList();
                 }
+            }
+
+            @Override
+            public void onSendClick(AudioItem item) {
+                // 检查无障碍服务是否启用
+                if (!isAccessibilityServiceEnabled()) {
+                    showAccessibilitySettingsDialog();
+                    return;
+                }
+
+                // 设置目标音频文件
+                VoiceAccessibilityService.setTargetAudioPath(item.getPath());
+                
+                // 提示用户
+                Toast.makeText(MainActivity.this, 
+                    "已选择音频，请切换到微信并进入语音模式", 
+                    Toast.LENGTH_LONG).show();
+                
+                // 启动监听服务
+                startVoiceMonitorService();
             }
 
             @Override
@@ -551,6 +575,60 @@ public class MainActivity extends AppCompatActivity {
         voiceTypeSpinner.setOnItemClickListener((parent, view, position, id) -> {
             selectedVoiceType = VoiceType.values()[position];
         });
+    }
+
+    private boolean isAccessibilityServiceEnabled() {
+        int accessibilityEnabled = 0;
+        try {
+            accessibilityEnabled = Settings.Secure.getInt(
+                getContentResolver(),
+                Settings.Secure.ACCESSIBILITY_ENABLED
+            );
+        } catch (Settings.SettingNotFoundException e) {
+            LogUtils.e("获取无障碍服务状态失败", e);
+        }
+
+        if (accessibilityEnabled == 1) {
+            String service = getPackageName() + "/" + 
+                VoiceAccessibilityService.class.getCanonicalName();
+            String enabledServices = Settings.Secure.getString(
+                getContentResolver(),
+                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+            );
+            return enabledServices != null && enabledServices.contains(service);
+        }
+        
+        return false;
+    }
+
+    private void showAccessibilitySettingsDialog() {
+        new MaterialAlertDialogBuilder(this)
+            .setTitle("需要无障碍权限")
+            .setMessage("请在设置中启用无障碍服务以使用发送功能")
+            .setPositiveButton("去设置", (dialog, which) -> {
+                Intent intent = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
+                startActivity(intent);
+            })
+            .setNegativeButton("取消", null)
+            .show();
+    }
+
+    private void startVoiceMonitorService() {
+        // 检查通知权限
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) 
+                != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1001);
+                return;
+            }
+        }
+
+        Intent serviceIntent = new Intent(this, VoiceMonitorService.class);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent);
+        } else {
+            startService(serviceIntent);
+        }
     }
 
     @Override

@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">voicechager</string>
+    <string name="accessibility_service_description">用于监测微信语音消息状态，实现自动播放变声音频</string>
 </resources>

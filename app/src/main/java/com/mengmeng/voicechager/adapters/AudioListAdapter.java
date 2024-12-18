@@ -27,6 +27,7 @@ public class AudioListAdapter extends RecyclerView.Adapter<AudioListAdapter.View
     public interface OnItemClickListener {
         void onPlayClick(AudioItem item, MaterialButton playButton);
         void onDeleteClick(AudioItem item);
+        void onSendClick(AudioItem item);
         void onItemSelected(AudioItem item);
     }
 
@@ -90,7 +91,7 @@ public class AudioListAdapter extends RecyclerView.Adapter<AudioListAdapter.View
 
         // 点击整个卡片的处理
         holder.cardView.setOnClickListener(v -> {
-            // 如果点击已选中的项目，则取消选择
+            // 如��点击已选中的项，则取消选择
             if (isSelected) {
                 setSelectedItem(null);
             } else {
@@ -115,6 +116,18 @@ public class AudioListAdapter extends RecyclerView.Adapter<AudioListAdapter.View
                 listener.onDeleteClick(item);
             }
         });
+
+        // 只为变声后的音频显示发送按钮
+        if (item.isConverted()) {
+            holder.sendButton.setVisibility(View.VISIBLE);
+            holder.sendButton.setOnClickListener(v -> {
+                if (listener != null) {
+                    listener.onSendClick(item);
+                }
+            });
+        } else {
+            holder.sendButton.setVisibility(View.GONE);
+        }
     }
 
     // 格式化文件大小
@@ -182,6 +195,7 @@ public class AudioListAdapter extends RecyclerView.Adapter<AudioListAdapter.View
         TextView sizeText;
         MaterialButton playButton;
         MaterialButton deleteButton;
+        MaterialButton sendButton;
 
         public ViewHolder(View view) {
             super(view);
@@ -191,6 +205,7 @@ public class AudioListAdapter extends RecyclerView.Adapter<AudioListAdapter.View
             sizeText = view.findViewById(R.id.audioSizeText);
             playButton = view.findViewById(R.id.playButton);
             deleteButton = view.findViewById(R.id.deleteButton);
+            sendButton = view.findViewById(R.id.sendButton);
         }
     }
 } 
