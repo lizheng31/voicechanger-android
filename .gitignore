@@ -53,3 +53,30 @@ lint/tmp/
 
 # MacOS
 .DS_Store
+
+# Android Studio 
+*.iws
+.idea/libraries/
+.idea/tasks.xml
+.idea/workspace.xml
+.idea/navEditor.xml
+.idea/assetWizardSettings.xml
+
+# VS Code
+.vscode/
+
+# Temp files
+*.tmp
+*.bak
+*.swp
+
+# Log files
+*.log
+
+# Local configuration
+.project
+.settings/
+.classpath
+
+# Doc generation
+/javadoc/

@@ -1,74 +1,7 @@
-# VoiceChager - Android 变声器应用
+# VoiceChanger - 语音变声器
 
-一款简洁现代的 Android 变声器应用，支持录音、变声和音频管理功能。
-
-## 功能概述
-
-### 已实现功能
-- ✅ 高质量音频录制 (16kHz, 单声道, 128kbps)
-- ✅ 多种预设音色变声
-- ✅ 音频文件管理和预览
-- ✅ Material Design 3 界面设计
-- ✅ 音频时长和大小显示
-
-### 开发中功能
-- 🚧 微信语音集成
-- 🚧 悬浮球快捷控制
-- 🚧 更多音色支持
-
-## 系统架构
-
-### 1. 核心模块
-
-#### 1.1 音频录制模块 (AudioRecordService)
-- 音频录制和编码
-- 文件保存管理
-- 录音状态控制
-
-#### 1.2 变声处理模块 (VoiceUploadManager)
-- WebSocket 音频传输
-- 实时变声处理
-- 音频格式转换
-
-#### 1.3 音频管理模块 (AudioPlayerManager)
-- 音频文件管理
-- 播放控制
-- 文件操作
-
-### 2. 界面模块
-
-#### 2.1 主界面 (MainActivity)
-- 录音控制
-- 音色选择
-- 文件列表显示
-
-#### 2.2 悬浮控制模块 (开发中)
-- 快捷音色切换
-- 录音快捷入口
-- 状态显示
-
-### 3. 微信集成模块 (开发中)
-
-#### 3.1 无障碍服务
-```java
-public class VoiceAccessibilityService extends AccessibilityService {
-    // 微信按钮识别
-    // 音频播放控制
-    // 事件同步处理
-}
-```
-
-#### 3.2 操作流程
-1. 检测微信语音按钮
-2. 触发音频播放
-3. 同步发送控制
-
-## 技术栈
-
-- 音频处理：MediaRecorder, FFmpeg
-- 网络通信：OkHttp, WebSocket
-- UI 框架：Material Design 3
-- 权限管理：PermissionX
+## 项目简介
+VoiceChanger 是一个 Android 语音变声应用，允许用户录制和编辑音频，添加有趣的声音效果。
 
 ## 项目结构
 
