@@ -7,8 +7,7 @@ import java.io.IOException;
 public class AudioPlayerManager {
     private MediaPlayer mediaPlayer;
     private String currentAudioPath;
-    private boolean isPaused = false;
-    private boolean isInitialized = false;
+    private boolean isPlaying = false;
 
     public interface OnPlaybackCompleteListener {
         void onComplete();
@@ -24,139 +23,104 @@ public class AudioPlayerManager {
         return currentAudioPath;
     }
 
-    public void playAudio(String audioPath) throws IOException {
+    public void playAudio(String audioPath) {
         LogUtils.d("开始播放音频: " + audioPath);
         
-        // 如果正在播放，先停止
-        if (isPlaying()) {
-            stopAudio();
+        // 如果已经在播放，先停止
+        if (isPlaying) {
+            stopPlaying();
         }
 
         try {
-            currentAudioPath = audioPath;
             mediaPlayer = new MediaPlayer();
             mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
             mediaPlayer.setDataSource(audioPath);
+            currentAudioPath = audioPath;
             
-            // 添加错误处理
-            mediaPlayer.setOnErrorListener((mp, what, extra) -> {
-                LogUtils.e("音频播放错误: what=" + what + ", extra=" + extra);
-                String errorMsg;
-                switch (what) {
-                    case MediaPlayer.MEDIA_ERROR_SERVER_DIED:
-                        errorMsg = "服务器错误";
-                        break;
-                    case MediaPlayer.MEDIA_ERROR_UNKNOWN:
-                        errorMsg = "未知错误";
-                        break;
-                    default:
-                        errorMsg = "播放错误: " + what;
-                }
-                LogUtils.e(errorMsg + ", extra=" + extra);
-                isPaused = false;
-                isInitialized = false;
-                releaseMediaPlayer();
-                return false;
-            });
-
-            mediaPlayer.setOnPreparedListener(mp -> {
-                try {
-                    mp.start();
-                    isInitialized = true;
-                    isPaused = false;
-                    LogUtils.d("音频开始播放");
-                } catch (IllegalStateException e) {
-                    LogUtils.e("开始播放失败", e);
-                    releaseMediaPlayer();
-                }
-            });
-            
+            // 设置音频完成监听器
             mediaPlayer.setOnCompletionListener(mp -> {
-                try {
-                    isPaused = false;
-                    isInitialized = false;
-                    if (onPlaybackCompleteListener != null) {
-                        onPlaybackCompleteListener.onComplete();
-                    }
-                    LogUtils.d("音频播放完成");
-                    releaseMediaPlayer();  // 播放完成后释放资源
-                } catch (Exception e) {
-                    LogUtils.e("播放完成处理失败", e);
-                }
+                LogUtils.d("音频播放完成");
+                isPlaying = false;
+                releaseMediaPlayer();
             });
 
-            mediaPlayer.prepareAsync();
+            // 设置错误监听器
+            mediaPlayer.setOnErrorListener((mp, what, extra) -> {
+                LogUtils.e("音频播放错误: " + what + ", " + extra);
+                isPlaying = false;
+                releaseMediaPlayer();
+                return true;
+            });
+
+            // 同步准备并立即播放
+            mediaPlayer.prepare();
+            mediaPlayer.start();
+            isPlaying = true;
+            LogUtils.d("音频开始播放");
         } catch (Exception e) {
             LogUtils.e("播放音频失败", e);
+            isPlaying = false;
             releaseMediaPlayer();
-            throw e;
         }
     }
 
     public void pauseAudio() {
-        if (mediaPlayer != null && isInitialized && mediaPlayer.isPlaying()) {
+        if (mediaPlayer != null && isPlaying) {
             try {
                 mediaPlayer.pause();
-                isPaused = true;
                 LogUtils.d("音频已暂停");
-            } catch (IllegalStateException e) {
+            } catch (Exception e) {
                 LogUtils.e("暂停音频失败", e);
             }
         }
     }
 
     public void resumeAudio() {
-        if (mediaPlayer != null && isInitialized && isPaused) {
+        if (mediaPlayer != null && isPlaying) {
             try {
                 mediaPlayer.start();
-                isPaused = false;
                 LogUtils.d("音频继续播放");
-            } catch (IllegalStateException e) {
+            } catch (Exception e) {
                 LogUtils.e("继续播放失败", e);
             }
         }
     }
 
-    public boolean isPaused() {
-        return isPaused;
+    public void stopPlaying() {
+        if (mediaPlayer != null && isPlaying) {
+            try {
+                mediaPlayer.stop();
+                LogUtils.d("停止播放音频");
+            } catch (Exception e) {
+                LogUtils.e("停止播放音频失败", e);
+            }
+            isPlaying = false;
+            releaseMediaPlayer();
+        }
     }
 
-    public void stopAudio() {
-        if (mediaPlayer != null) {
-            try {
-                if (isInitialized) {
-                    mediaPlayer.stop();
-                }
-            } catch (IllegalStateException e) {
-                LogUtils.e("停止音频失败", e);
-            } finally {
-                releaseMediaPlayer();
-            }
-        }
+    public void release() {
+        stopPlaying();
     }
 
     private void releaseMediaPlayer() {
         if (mediaPlayer != null) {
             try {
                 mediaPlayer.release();
+                LogUtils.d("释放MediaPlayer资源");
             } catch (Exception e) {
                 LogUtils.e("释放MediaPlayer资源失败", e);
-            } finally {
-                mediaPlayer = null;
-                currentAudioPath = null;
-                isPaused = false;
-                isInitialized = false;
-                LogUtils.d("释放MediaPlayer资源");
             }
+            mediaPlayer = null;
+            currentAudioPath = null;
         }
     }
 
     public boolean isPlaying() {
-        return mediaPlayer != null && isInitialized && mediaPlayer.isPlaying();
+        return isPlaying && mediaPlayer != null && mediaPlayer.isPlaying();
     }
 
-    // 在Activity/Fragment销毁时调用
-    public void release() {
-        stopAudio();
+    public boolean isPaused() {
+        return false;
     }
 } 

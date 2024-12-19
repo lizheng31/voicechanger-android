@@ -110,6 +110,58 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:nestedScrollingEnabled="false"/>
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                style="@style/Widget.Material3.CardView.Elevated">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="播放延迟设置"
+                        android:textAppearance="@style/TextAppearance.Material3.TitleMedium"/>
+
+                    <RadioGroup
+                        android:id="@+id/delayRadioGroup"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:layout_marginTop="8dp">
+
+                        <RadioButton
+                            android:id="@+id/delayNone"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="不延迟"/>
+
+                        <RadioButton
+                            android:id="@+id/delay300"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="延迟0.3秒"/>
+
+                        <RadioButton
+                            android:id="@+id/delay600"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="延迟0.6秒"/>
+
+                        <RadioButton
+                            android:id="@+id/delay1000"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="延迟1.0秒"/>
+                    </RadioGroup>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

@@ -43,6 +43,11 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.mengmeng.voicechager.services.VoiceAccessibilityService;
 import com.mengmeng.voicechager.services.VoiceMonitorService;
 import android.content.pm.PackageManager;
+import com.google.android.material.slider.Slider;
+import android.content.SharedPreferences;
+import android.os.Handler;
+import android.widget.RadioGroup;
+import android.widget.RadioButton;
 
 public class MainActivity extends AppCompatActivity {
     private MaterialButton recordButton;
@@ -59,6 +64,13 @@ public class MainActivity extends AppCompatActivity {
     private AudioItem selectedAudioItem;
     private AutoCompleteTextView voiceTypeSpinner;
     private VoiceType selectedVoiceType = VoiceType.CHONGCHONG; // 默认音色
+
+    private Slider delaySlider;
+    private TextView delayValueText;
+    private static float playbackDelay = 1.0f;
+
+    private static long selectedDelay = 300; // 默认延迟0.3秒
+    private RadioGroup delayRadioGroup;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -88,12 +100,47 @@ public class MainActivity extends AppCompatActivity {
         recordingTimer = findViewById(R.id.recordingTimer);
 
         MaterialToolbar topAppBar = findViewById(R.id.topAppBar);
-        topAppBar.setOnMenuItemClickListener(item -> {
-            if (item.getItemId() == R.id.settings) {
-                // TODO: 打开设置界面
-                return true;
+        // 移除菜单监听器，因为我们已经删除了设置按钮
+
+        // 初始化延迟选择控件
+        delayRadioGroup = findViewById(R.id.delayRadioGroup);
+        
+        // 读取保存的延迟设置
+        SharedPreferences prefs = getSharedPreferences("VoiceChangerPrefs", MODE_PRIVATE);
+        selectedDelay = prefs.getLong("playback_delay", 300);
+        
+        // 设置对应的选项
+        switch ((int)selectedDelay) {
+            case 0:
+                delayRadioGroup.check(R.id.delayNone);
+                break;
+            case 300:
+                delayRadioGroup.check(R.id.delay300);
+                break;
+            case 600:
+                delayRadioGroup.check(R.id.delay600);
+                break;
+            case 1000:
+                delayRadioGroup.check(R.id.delay1000);
+                break;
+        }
+
+        // 添加选择监听器
+        delayRadioGroup.setOnCheckedChangeListener((group, checkedId) -> {
+            if (checkedId == R.id.delayNone) {
+                selectedDelay = 0;
+            } else if (checkedId == R.id.delay300) {
+                selectedDelay = 300;
+            } else if (checkedId == R.id.delay600) {
+                selectedDelay = 600;
+            } else if (checkedId == R.id.delay1000) {
+                selectedDelay = 1000;
             }
-            return false;
+            
+            // 保存设置
+            SharedPreferences.Editor editor = getSharedPreferences("VoiceChangerPrefs", MODE_PRIVATE).edit();
+            editor.putLong("playback_delay", selectedDelay);
+            editor.apply();
         });
     }
 
@@ -119,7 +166,7 @@ public class MainActivity extends AppCompatActivity {
             .permissions(permissions)
             .request((allGranted, grantedList, deniedList) -> {
                 if (!allGranted) {
-                    Toast.makeText(this, "需要录音和存储权限才能使用此功能", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "需要录音和存储权限才能��用此功能", Toast.LENGTH_SHORT).show();
                     finish();
                 } else {
                     createRequiredDirectories();
@@ -300,27 +347,7 @@ public class MainActivity extends AppCompatActivity {
         audioListAdapter.setOnItemClickListener(new AudioListAdapter.OnItemClickListener() {
             @Override
             public void onPlayClick(AudioItem item, MaterialButton playButton) {
-                try {
-                    if (!audioPlayerManager.isPlaying() || 
-                        !item.getPath().equals(audioPlayerManager.getCurrentAudioPath())) {
-                        if (audioPlayerManager.isPaused() && 
-                            item.getPath().equals(audioPlayerManager.getCurrentAudioPath())) {
-                            audioPlayerManager.resumeAudio();
-                            playButton.setIconResource(android.R.drawable.ic_media_pause);
-                        } else {
-                            audioPlayerManager.playAudio(item.getPath());
-                            playButton.setIconResource(android.R.drawable.ic_media_pause);
-                        }
-                    } else {
-                        audioPlayerManager.pauseAudio();
-                        playButton.setIconResource(android.R.drawable.ic_media_play);
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                    Toast.makeText(MainActivity.this, 
-                        "播放失败：" + e.getMessage(), 
-                        Toast.LENGTH_SHORT).show();
-                }
+                handleAudioItemClick(item);
             }
 
             @Override
@@ -474,7 +501,7 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        // 按时间倒序排序
+        // 按时间倒序��序
         Collections.sort(items, (a, b) -> {
             try {
                 SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
@@ -525,7 +552,7 @@ public class MainActivity extends AppCompatActivity {
             String nameWithoutExt = nameWithoutPrefix.substring(0, nameWithoutPrefix.lastIndexOf('.'));
             String[] parts = nameWithoutExt.split("_");
             if (parts.length >= 2) {
-                // 提取日期时间部分
+                // ���取日期时间部分
                 String dateStr = parts[0];
                 String timeStr = parts[1];
                 
@@ -538,7 +565,7 @@ public class MainActivity extends AppCompatActivity {
                     timeStr.substring(2, 4)
                 );
                 
-                // 如果有音色信息，添加到显示名称中
+                // 如果有音色息，添加��显示名称中
                 String voiceType = extractVoiceType(fileName);
                 if (voiceType != null && !voiceType.isEmpty()) {
                     return String.format("变声音频 [%s] [MP3] %s", voiceType, formattedDateTime);
@@ -614,6 +641,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startVoiceMonitorService() {
+        // 先检查无障碍服务是否启用
+        if (!isAccessibilityServiceEnabled()) {
+            showAccessibilitySettingsDialog();
+            return;
+        }
+
         // 检查通知权限
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) 
@@ -623,12 +656,21 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        Intent serviceIntent = new Intent(this, VoiceMonitorService.class);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(serviceIntent);
-        } else {
-            startService(serviceIntent);
-        }
+        // 等待一小段时间确保服务已经启动
+        new Handler().postDelayed(() -> {
+            if (VoiceAccessibilityService.getInstance() == null) {
+                Toast.makeText(this, "无障碍服务未启动，请在设置中启用", Toast.LENGTH_LONG).show();
+                showAccessibilitySettingsDialog();
+                return;
+            }
+            
+            Intent serviceIntent = new Intent(this, VoiceMonitorService.class);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent);
+            } else {
+                startService(serviceIntent);
+            }
+        }, 500);
     }
 
     @Override
@@ -637,6 +679,48 @@ public class MainActivity extends AppCompatActivity {
         audioPlayerManager.release();
         if (isRecording) {
             audioRecordService.stopRecording();
+        }
+    }
+
+    // 添加获取延迟时间的静态方法
+    public static long getPlaybackDelay() {
+        return selectedDelay;
+    }
+
+    private void handleAudioItemClick(AudioItem item) {
+        if (audioPlayerManager.isPlaying()) {
+            // 如果正在播放其他音频，先停止
+            if (!item.getPath().equals(audioPlayerManager.getCurrentAudioPath())) {
+                if (audioPlayerManager.isPaused() && 
+                    item.getPath().equals(audioPlayerManager.getCurrentAudioPath())) {
+                    audioPlayerManager.resumeAudio();
+                } else {
+                    audioPlayerManager.playAudio(item.getPath());
+                    updatePlayButtonState(item, true);
+                }
+            } else {
+                // 如果点击的是当前正在播放的音频，则暂停
+                audioPlayerManager.pauseAudio();
+                updatePlayButtonState(item, false);
+            }
+        } else {
+            // 开始播放新的音频
+            audioPlayerManager.playAudio(item.getPath());
+            updatePlayButtonState(item, true);
+        }
+    }
+
+    private void updatePlayButtonState(AudioItem item, boolean isPlaying) {
+        // 找到对应的 ViewHolder
+        RecyclerView.ViewHolder holder = audioListView.findViewHolderForAdapterPosition(
+            audioListAdapter.getItemPosition(item));
+        
+        if (holder instanceof AudioListAdapter.ViewHolder) {
+            AudioListAdapter.ViewHolder audioHolder = 
+                (AudioListAdapter.ViewHolder) holder;
+            
+            // 使用 ViewHolder 的方法更新按钮状态
+            audioHolder.updatePlayButtonState(isPlaying);
         }
     }
 }

@@ -2,6 +2,10 @@ package com.mengmeng.voicechager.services;
 
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.AccessibilityServiceInfo;
+import android.content.Intent;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import com.mengmeng.voicechager.utils.LogUtils;
@@ -10,64 +14,63 @@ import java.util.List;
 public class VoiceAccessibilityService extends AccessibilityService {
     private static VoiceAccessibilityService instance;
     private static String targetAudioPath;
-    private boolean isWeChatVoiceMode = false;
-    
+    private boolean isButtonPressed = false;
+    private static final String BTN_TEXT_PRESS = "按住 说话";
+    private static final String BTN_TEXT_RELEASE = "松开 发送";
+
     @Override
     public void onCreate() {
         super.onCreate();
         instance = this;
+        LogUtils.d("无障碍服务已创建");
     }
-    
+
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
         if (event.getPackageName() == null || !event.getPackageName().equals("com.tencent.mm")) {
             return;
         }
 
-        LogUtils.d("收到微信的无障碍事件: " + event.getEventType());
-
-        AccessibilityNodeInfo rootNode = getRootInActiveWindow();
-        if (rootNode == null) {
-            LogUtils.d("无法获取根节点");
+        if (event.getEventType() != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED && 
+            event.getEventType() != AccessibilityEvent.TYPE_VIEW_CLICKED && 
+            event.getEventType() != AccessibilityEvent.TYPE_VIEW_LONG_CLICKED) {
             return;
         }
 
-        // 检测是否在微信聊天界面的语音模式
-        AccessibilityNodeInfo pressToTalkButton = findPressToTalkButton(rootNode);
-        boolean currentIsVoiceMode = pressToTalkButton != null;
-        
-        // 状态变化：进入语音模式
-        if (currentIsVoiceMode && !isWeChatVoiceMode) {
-            LogUtils.d("检测到进入微信语音模式");
-            isWeChatVoiceMode = true;
+        AccessibilityNodeInfo rootNode = getRootInActiveWindow();
+        if (rootNode == null) {
+            return;
         }
-        
-        // 状态变化：退出语音模式
-        if (!currentIsVoiceMode && isWeChatVoiceMode) {
-            LogUtils.d("检测到退出微信语音模式");
-            isWeChatVoiceMode = false;
+
+        List<AccessibilityNodeInfo> releaseNodes = rootNode.findAccessibilityNodeInfosByText(BTN_TEXT_RELEASE);
+        if (releaseNodes != null && !releaseNodes.isEmpty()) {
+            if (!isButtonPressed) {
+                isButtonPressed = true;
+                LogUtils.d("检测到按钮被按住");
+            }
+            recycleNodes(releaseNodes);
+            rootNode.recycle();
+            return;
         }
-        
+
+        List<AccessibilityNodeInfo> pressNodes = rootNode.findAccessibilityNodeInfosByText(BTN_TEXT_PRESS);
+        if (pressNodes != null && !pressNodes.isEmpty()) {
+            if (isButtonPressed) {
+                isButtonPressed = false;
+                LogUtils.d("检测到按钮被释放");
+            }
+            recycleNodes(pressNodes);
+        }
+
         rootNode.recycle();
     }
 
-    private AccessibilityNodeInfo findPressToTalkButton(AccessibilityNodeInfo root) {
-        // 查找"按住说话"按钮
-        List<AccessibilityNodeInfo> list = root.findAccessibilityNodeInfosByText("按住 说话");
-        if (list != null && !list.isEmpty()) {
-            LogUtils.d("找到'按住 说话'按钮");
-            return list.get(0);
+    private void recycleNodes(List<AccessibilityNodeInfo> nodes) {
+        for (AccessibilityNodeInfo node : nodes) {
+            if (node != null) {
+                node.recycle();
+            }
         }
-
-        // 如果没找到，尝试其他可能的文本
-        list = root.findAccessibilityNodeInfosByText("按住说话");
-        if (list != null && !list.isEmpty()) {
-            LogUtils.d("找到'按住说话'按钮");
-            return list.get(0);
-        }
-
-        LogUtils.d("未找到语音按钮");
-        return null;
     }
 
     @Override
@@ -78,18 +81,29 @@ public class VoiceAccessibilityService extends AccessibilityService {
     @Override
     protected void onServiceConnected() {
         super.onServiceConnected();
+        instance = this;
         AccessibilityServiceInfo info = new AccessibilityServiceInfo();
         info.eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED | 
                          AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED |
                          AccessibilityEvent.TYPE_VIEW_CLICKED |
+                         AccessibilityEvent.TYPE_VIEW_LONG_CLICKED |
+                         AccessibilityEvent.TYPE_VIEW_SELECTED |
                          AccessibilityEvent.TYPE_VIEW_FOCUSED;
         info.feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC;
         info.notificationTimeout = 100;
         info.flags = AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS |
-                    AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS;
+                    AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS |
+                    AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS;
         info.packageNames = new String[]{"com.tencent.mm"};
         setServiceInfo(info);
         LogUtils.d("无障碍服务已连接");
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        instance = null;
+        LogUtils.d("无障碍服务已销毁");
     }
 
     public static void setTargetAudioPath(String path) {
@@ -104,7 +118,7 @@ public class VoiceAccessibilityService extends AccessibilityService {
         return instance;
     }
 
-    public boolean isInWeChatVoiceMode() {
-        return isWeChatVoiceMode;
+    public boolean isButtonPressed() {
+        return isButtonPressed;
     }
 } 

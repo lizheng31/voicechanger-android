@@ -91,7 +91,7 @@ public class AudioListAdapter extends RecyclerView.Adapter<AudioListAdapter.View
 
         // 点击整个卡片的处理
         holder.cardView.setOnClickListener(v -> {
-            // 如��点击已选中的项，则取消选择
+            // 如果点击已选中的项��则取消选择
             if (isSelected) {
                 setSelectedItem(null);
             } else {
@@ -188,14 +188,18 @@ public class AudioListAdapter extends RecyclerView.Adapter<AudioListAdapter.View
         this.audioPlayerManager = audioPlayerManager;
     }
 
+    public int getItemPosition(AudioItem item) {
+        return audioItems.indexOf(item);
+    }
+
     public static class ViewHolder extends RecyclerView.ViewHolder {
-        MaterialCardView cardView;
-        TextView nameText;
-        TextView dateText;
-        TextView sizeText;
-        MaterialButton playButton;
-        MaterialButton deleteButton;
-        MaterialButton sendButton;
+        public MaterialCardView cardView;
+        public TextView nameText;
+        public TextView dateText;
+        public TextView sizeText;
+        public MaterialButton playButton;
+        public MaterialButton deleteButton;
+        public MaterialButton sendButton;
 
         public ViewHolder(View view) {
             super(view);
@@ -206,6 +210,12 @@ public class AudioListAdapter extends RecyclerView.Adapter<AudioListAdapter.View
             playButton = view.findViewById(R.id.playButton);
             deleteButton = view.findViewById(R.id.deleteButton);
             sendButton = view.findViewById(R.id.sendButton);
+        }
+
+        public void updatePlayButtonState(boolean isPlaying) {
+            playButton.setIconResource(
+                isPlaying ? android.R.drawable.ic_media_pause 
+                         : android.R.drawable.ic_media_play);
         }
     }
 } 

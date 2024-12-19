@@ -5,11 +5,13 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import androidx.core.app.NotificationCompat;
+import com.mengmeng.voicechager.MainActivity;
 import com.mengmeng.voicechager.R;
 import com.mengmeng.voicechager.utils.AudioPlayerManager;
 import com.mengmeng.voicechager.utils.LogUtils;
@@ -17,9 +19,14 @@ import com.mengmeng.voicechager.utils.LogUtils;
 public class VoiceMonitorService extends Service {
     private static final int NOTIFICATION_ID = 1;
     private static final String CHANNEL_ID = "VoiceMonitor";
+    private static final String PREFS_NAME = "VoiceChangerPrefs";
+    private static final String KEY_PLAYBACK_DELAY = "playback_delay";
+    private static final float DEFAULT_DELAY = 1.0f;
+    private static final long FIXED_DELAY = 500; // 0.5秒固定延迟
     private Handler handler;
     private AudioPlayerManager audioPlayerManager;
     private boolean isMonitoring = false;
+    private boolean hasPlayed = false;  // 添加标记，避免重复播放
 
     @Override
     public void onCreate() {
@@ -41,13 +48,15 @@ public class VoiceMonitorService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if (!isMonitoring) {
-            startMonitoring();
-        }
+        startMonitoring();
         return START_STICKY;
     }
 
     private void startMonitoring() {
+        if (isMonitoring) {
+            return;
+        }
+
         isMonitoring = true;
         LogUtils.d("开始监控微信语音状态");
         
@@ -55,39 +64,27 @@ public class VoiceMonitorService extends Service {
             @Override
             public void run() {
                 if (!isMonitoring) {
-                    LogUtils.d("监控已停止");
                     return;
                 }
 
                 VoiceAccessibilityService service = VoiceAccessibilityService.getInstance();
                 if (service == null) {
-                    LogUtils.d("无障碍服务未运行");
                     handler.postDelayed(this, 100);
                     return;
                 }
 
-                if (service.isInWeChatVoiceMode()) {
-                    LogUtils.d("检测到微信语音模式");
+                if (service.isButtonPressed()) {
                     String audioPath = VoiceAccessibilityService.getTargetAudioPath();
                     if (audioPath != null) {
-                        LogUtils.d("准备播放音频: " + audioPath);
-                        handler.postDelayed(() -> {
-                            try {
-                                audioPlayerManager.playAudio(audioPath);
-                                LogUtils.d("开始播放音频");
-                            } catch (Exception e) {
-                                LogUtils.e("播放音频失败", e);
-                            }
-                        }, 800);
+                        audioPlayerManager.setOnPlaybackCompleteListener(() -> {
+                            startMonitoring();
+                        });
+                        
+                        audioPlayerManager.playAudio(audioPath);
                         
                         isMonitoring = false;
-                        stopSelf();
                         return;
-                    } else {
-                        LogUtils.d("未设置目标音频文件");
                     }
-                } else {
-                    LogUtils.d("等待进入微信语音模式");
                 }
 
                 handler.postDelayed(this, 100);
@@ -129,11 +126,17 @@ public class VoiceMonitorService extends Service {
         isMonitoring = false;
         if (audioPlayerManager != null) {
             audioPlayerManager.release();
+            audioPlayerManager = null;
         }
     }
 
     @Override
     public IBinder onBind(Intent intent) {
         return null;
+    }
+
+    private float getPlaybackDelay() {
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        return prefs.getFloat(KEY_PLAYBACK_DELAY, DEFAULT_DELAY);
     }
 } 
