@@ -80,3 +80,11 @@ lint/tmp/
 
 # Doc generation
 /javadoc/
+
+# 密钥相关文件不要提交到git
+*.jks
+keystore.properties
+
+# 编译输出
+app/build/
+app/release/
